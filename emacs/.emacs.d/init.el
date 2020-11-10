@@ -5,14 +5,13 @@
 ;;; Code:
 (require 'package)
 
-;; Packages
-(add-to-list 'package-archives
-             '("melpa" . "http://melpa.org/packages/"))
+(setq package-archives '(("melpa" . "https://melpa.org/packages/")
+                         ("org" . "https://orgmode.org/elpa/")
+                         ("elpa" . "https://elpa.gnu.org/packages/")))
 
-;; Initialise the packages, avoiding a re-initialisation.
-(unless (bound-and-true-p package--initialized)
-  (setq package-enable-at-startup nil)
-  (package-initialize))
+(package-initialize)
+(unless package-archive-contents
+  (package-refresh-contents))
 
 ;; Load use-package, used for loading packages
 (unless (package-installed-p 'use-package)
@@ -21,7 +20,7 @@
 
 ;; Configure `use-package' prior to loading it.
 (eval-and-compile
-  (setq use-package-always-ensure nil)
+  (setq use-package-always-ensure t)
   (setq use-package-always-defer nil)
   (setq use-package-always-demand nil)
   (setq use-package-expand-minimally nil)
@@ -47,12 +46,15 @@
 ;;
 (use-package org)
 
-(let* ((conf "~/.emacs.d/settings")
-       (el (concat conf ".el"))
-       (org (concat conf ".org")))
-  (if (file-exists-p el)
-      (load-file el)
-    (org-babel-load-file org)))
+;;          (let* ((conf "~/.emacs.d/settings")
+;;                 (el (concat conf ".el"))
+;;                 (org (concat conf ".org")))
+;;            (org-babel-load-file org))
+
+;; (require 'org)
+(org-babel-load-file
+ (expand-file-name "settings.org"
+                   user-emacs-directory))
 
 ;; Message how long it took to load everything (minus packages)
 (let ((elapsed (float-time (time-subtract (current-time)

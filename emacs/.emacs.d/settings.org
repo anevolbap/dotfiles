@@ -1,400 +1,559 @@
 #+LANGUAGE: en
 #+PROPERTY: header-args :tangle yes
 #+EXPORT_SELECT_TAGS: export
-#+EXPORT_EXCLUDE_TAGS: noexport
-
-#+BEGIN_SRC emacs-lisp
-(setq frame-resize-pixelwise t)
-
-(use-package vc
-  :config
-  (setq vc-follow-symlinks t)) ; Because my dotfiles are managed that way
-#+END_SRC 
+#+EXPORT_EXCLUDS: noexport
 
 * Introduction
 
   My Emacs configuration so far...
 
+** GNU sto 
+   
+* Configuration
 
-* External links
-
-  Use browser depending on url
-  #+BEGIN_SRC emacs-lisp
-(setq browse-url-browser-function
-'(
-("meet.google.com" . browse-url-chrome)
-("thefreedictionary\\.com" . eww-browse-url)
-("." . browse-url-default-browser)
-))
-  #+END_SRC 
-
-
-* Packages
-  #+BEGIN_SRC emacs-lisp
-
-  ;; keep customize settings in their own file
-  (setq custom-file "~/.emacs.d/custom.el")
-  (when (file-exists-p custom-file)
-  (load custom-file))
-  
-  ;; dotfiles
-  (setq dotfiles-dir (expand-file-name "~/.emacs.d/"))
-  (add-to-list 'load-path (concat dotfiles-dir "lisp/"))
-  (add-to-list 'load-path (concat dotfiles-dir "elpa/"))
-  
-  ; custom files for M-x customize
-  (setq custom-file (concat dotfiles-dir "custom.el"))
-  (when (file-exists-p custom-file)
-  (load custom-file))
-  
-  ;; Enable narrowing commands.
-  ;;          (put 'narrow-to-region 'disabled nil)
-  #+END_SRC
-  
-** ESS
-   #+BEGIN_SRC emacs-lisp
-  (use-package ess
-  :ensure t
-  :init (require 'ess-site))
-   #+END_SRC
-
-* Theme
-
-  #+BEGIN_SRC emacs-lisp
-  (load-theme 'modus-vivendi t)  ;; theme
-  #+END_SRC
-
-** Aesthetics
+** Autotangle
 
    #+BEGIN_SRC emacs-lisp
-  (setq initial-scratch-message "")
-  (setq inhibit-startup-message t) ;; no intro
-  (scroll-bar-mode -1) ;; no horizontal scrollbar
-  (menu-bar-mode -1) ;; no menubar
-  (tool-bar-mode -1) ;; gets rid of the tool bar at the top.
-  (column-number-mode t) ;; Display column number in mode line.
-  (global-linum-mode t) ;; line numbers
-  (global-visual-line-mode t) ;; Wrap words
-  (fset 'yes-or-no-p 'y-or-n-p) ;; Change all yes/no questions to y/n type
+   ;; Automatically tangle our Emacs.org config file when we save it
+   (defun org-babel-tangle-config ()
+   (when (string-equal (buffer-file-name)
+   (expand-file-name "settings.org" user-emacs-directory))
+   ;; Dynamic scoping to the rescue
+   (let ((org-confirm-babel-evaluate nil))
+   (org-babel-tangle))))
+   
+   (add-hook 'org-mode-hook (lambda () (add-hook 'after-save-hook #'org-babel-tangle-config)))
    #+END_SRC
-  
-   Lines and columns
+
+** Parenthesis
    #+BEGIN_SRC emacs-lisp
-  (line-number-mode 1)
-  (column-number-mode 1)
-   #+END_SRC
+   (use-package rainbow-delimiters
+   :hook (prog-mode . rainbow-delimiters-mode))
+     ;;          (show-paren-mode 0)
+   #+END_SRC 
 
-   Hide the mouse while typing:
+** Custom files
+   M-x customize stuff
    #+BEGIN_SRC emacs-lisp
-  (setq make-pointer-invisible t)
-   #+END_SRC
+     (setq dotfiles-dir (expand-file-name "~/.emacs.d/"))
+     (setq-default custom-file (concat dotfiles-dir "custom.el"))
+     (when (file-exists-p custom-file)
+     (load custom-file))
+   #+END_SRC 
 
-   Set up the fill-column to 80 characters and set tab width to 2
+** Narrow
+   Enable narrowing commands.
    #+BEGIN_SRC emacs-lisp
-  (setq-default fill-column 80)
-  (setq-default default-tab-width 2)
-  (setq-default indent-tabs-mode nil)
-   #+END_SRC
+     ;; (put 'narrow-to-region 'disabled nil)
+   #+END_SRC 
 
-* Windows
-
-** Resize window
+** Packages
    #+BEGIN_SRC emacs-lisp
- (global-set-key (kbd" S-C-,") 'shrink-window-horizontally)
- (global-set-key (kbd "S-C-.") 'enlarge-window-horizontally)
+     ;; dotfiles
+     (setq dotfiles-dir (expand-file-name "~/.emacs.d/"))
+     (add-to-list 'load-path (concat dotfiles-dir "lisp/"))
+     (add-to-list 'load-path (concat dotfiles-dir "elpa/"))
    #+END_SRC
 
-** Winner mode
-
+** ESS  
    #+BEGIN_SRC emacs-lisp
-(winner-mode 1)
-(global-set-key (kbd "<C-c-right>") 'winner-redo)
-(global-set-key (kbd "<C-c-left>") 'winner-undo)
+     (use-package ess 
+     :ensure t 
+     :init (require 'ess-site)
+     :config (setq ss-pdf-viewer-pref "xreader")
+     :mode (("\\.[rR]\\'" . R-mode)
+     ("\\.Rnw\\'" . Rnw-mode)))
+     #+END_SRC
+** Fonts
+   #+BEGIN_SRC emacs-lisp
+     (set-face-attribute 'default nil :font "Hack")
+   #+END_SRC
+   
+** Ivy
+   #+BEGIN_SRC emacs-lisp
+     (use-package ivy
+     :diminish
+     :bind (("C-s" . swiper)
+     :map ivy-minibuffer-map
+     ("TAB" . ivy-alt-done)	
+     ("C-l" . ivy-alt-done)
+     ("C-j" . ivy-next-line)
+     ("C-k" . ivy-previous-line)
+     :map ivy-switch-buffer-map
+     ("C-k" . ivy-previous-line)
+     ("C-l" . ivy-done)
+     ("C-d" . ivy-switch-buffer-kill)
+     :map ivy-reverse-i-search-map
+     ("C-k" . ivy-previous-line)
+     ("C-d" . ivy-reverse-i-search-kill))
+     :config
+     (ivy-mode 1))                           
+   #+END_SRC
+   
+** Doomline
+   #+BEGIN_SRC emacs-lisp
+   (use-package doom-modeline
+   :ensure t
+   :init (doom-modeline-mode 1)
+   :custom ((doom-modeline-height 15)))
+   #+END_SRC
+   
+** EWXM
+   #+BEGIN_SRC emacs-lisp
+     ;;          (require 'exwm)
+     ;;          (require 'exwm-config)
+     ;;          (exwm-config-default)
    #+END_SRC
 
+** UTF8
+   #+BEGIN_SRC emacs-lisp
+   (prefer-coding-system 'utf-8)
+   (set-default-coding-systems 'utf-8)
+   (set-terminal-coding-system 'utf-8)
+   (set-keyboard-coding-system 'utf-8)
+   (setq default-buffer-file-coding-system 'utf-8)
+   #+END_SRC
 
-* UTF8
+   Turn on syntax highlighting for all buffers:
+   #+BEGIN_SRC emacs-lisp
+   (global-font-lock-mode t)
+   #+END_SRC
 
-  #+BEGIN_SRC emacs-lisp
-  (prefer-coding-system 'utf-8)
-  (set-default-coding-systems 'utf-8)
-  (set-terminal-coding-system 'utf-8)
-  (set-keyboard-coding-system 'utf-8)
-  (setq default-buffer-file-coding-system 'utf-8)
-  #+END_SRC
+   When I select a region and start typing, just delete the region automatically
+   #+BEGIN_SRC emacs-lisp
+   (delete-selection-mode 1)
+   #+END_SRC
 
-  Turn on syntax highlighting for all buffers:
-  #+BEGIN_SRC emacs-lisp
-  (global-font-lock-mode t)
-  #+END_SRC
+** Version Control
+   #+BEGIN_SRC emacs-lisp
+       (use-package vc
+       :config
+       (setq vc-follow-symlinks t)) ; Because my dotfiles are managed that way
+   #+END_SRC 
 
-  When I select a region and start typing, just delete the region automatically
-  #+BEGIN_SRC emacs-lisp
-  (delete-selection-mode 1)
-  #+END_SRC
+*** Magit
+    #+BEGIN_SRC emacs-lisp
+    (use-package magit
+    :bind (("C-x g" . magit-status))
+    )
+    ; require is only so we can remove the vc hook:
+    (require 'vc)
+    (remove-hook 'find-file-hooks 'vc-find-file-hook) 
+    #+END_SRC
 
-* Autocomplete
-  #+BEGIN_SRC emacs-lisp
-  ;; Parenthesis
-  (show-paren-mode 1)
-
-  ;; Use company mode everywhere.
-  (global-company-mode t)
-
-  ;; Navigate in completion minibuffer with `C-n` and `C-p`.
-  (define-key company-active-map (kbd "C-n") 'company-select-next)
-  (define-key company-active-map (kbd "C-p") 'company-select-previous)
-  
-  ;; Provide instant autocompletion.
-  (setq company-idle-delay 0.0)
-  #+END_SRC
-
-* Spelling
-
-  #+BEGIN_SRC emacs-lisp
-  (setq ispell-program-name "aspell")
-  (setq ispell-list-command "list")
-  #+END_SRC
-
-* Feed 
-  #+BEGIN_SRC emacs-lisp
-    ;; Feeds
-    (global-set-key (kbd "C-x w") 'elfeed)
-    (setq elfeed-feeds
-          '(("https://www.reddit.com/r/emacs/comments.rss" emacs)
-            ("https://www.infobae.com/feeds/rss/" infobae)
-  #+END_SRC
-
-* Stuff
-  #+BEGIN_SRC emacs-lisp
-      ;; Automatically update buffers if file content on the disk has changed.
-      (global-auto-revert-mode t)
-
-      ;; Do tabs right
-      (setq-default indent-tabs-mode nil)
-      (setq-default tab-width 4)
-      (setq indent-line-function 'insert-tab)
- 
-      (setq c-basic-offset 4)
-
-      ;; Fonts
-      ;;          (defun m/monospaced-font ()
-      ;;            (interactive)
-      ;;            (setq buffer-face-mode-face '(:family "Hack"))
-      ;;            (buffer-face-mode))
-      
-      ;;          (set-frame-font "-PfEd-Fantasque Sans Mono-normal-normal-normal-*-*-*-*-*-m-0-iso10646-1")
-      
-      ;; Autofill
-      (add-hook 'text-mode-hook 'auto-fill-mode)
-      
-      ("https://www.reddit.com/r/emacs.rss" emacs)))
-      
+** Estética
+*** Pantalla 
+    #+BEGIN_SRC emacs-lisp
       ;; Fullscreen
-      ;; (toggle-frame-fullscreen)
-      
-      ;; ORG
-      (require 'org)
-      (global-set-key "\C-cl" 'org-store-link)
-      (global-set-key "\C-ca" 'org-agenda)
-      (global-set-key "\C-cc" 'org-capture)
-      (global-set-key "\C-cb" 'org-switchb)
-      ;; (setq org-default-notes-file (concat org-directory "/notes.org"))
-      ;; (setq define-key global-map "\C-cc" 'org-capture)
-      ;; (setq org-default-notes-file "/home/pablinha/Dropbox/.notes.org")
-      ;; (setq org-directory "/home/pablinha/Documentos/apps/org")
-      ;; (setq org-support-shift-select t)
-      
-      ;;
-      (custom-set-variables
-      ;; custom-set-variables was added by Custom.
-      ;; If you edit it by hand, you could mess it up, so be careful.
-      ;; Your init file should contain only one such instance.
-      ;; If there is more than one, they won't work right.
-      '(TeX-view-program-list '(("Xreader" "xreader --page-index=%(outpage) %o")))
-      '(TeX-view-program-selection
-      '(((output-dvi style-pstricks)
-      "dvips and gv")
-      (output-dvi "xdvi")
-      (output-pdf "Xreader")
-      (output-html "xdg-open")))
-      '(backward-delete-char-untabify-method 'hungry)
-      '(comment-auto-fill-only-comments t)
-      '(comment-empty-lines nil)
-      '(comment-multi-line t)
-      '(comment-padding 10)
-      '(company-quickhelp-color-background "#4F4F4F")
-      '(company-quickhelp-color-foreground "#DCDCCC")
-      '(cua-mode t nil (cua-base))
-      '(electric-indent-mode t)
-      '(electric-layout-mode t)
-      '(electric-pair-mode t)
-      '(electric-pair-skip-self nil)
-      '(ess-pdf-viewer-pref "xreader")
-      '(org-support-shift-select 'always)
-      '(package-selected-packages
-      '(chess ## pyenv-mode flycheck auctex jedi reformatter markdown-mode elpy yasnippet ess orgtbl-aggregate gnugo dictionary pdf-tools ein keycast elfeed use-package magit))
-      '(pdf-view-midnight-colors '("#DCDCCC" . "#383838"))
-     '(tab-always-indent 'complete))
-     (custom-set-faces
-     ;; custom-set-faces was added by Custom.
-     ;; If you edit it by hand, you could mess it up, so be careful.
-     ;; Your init file should contain only one such instance.
-     ;; If there is more than one, they won't work right.
-     )
-     
-     (add-hook 'after-init-hook #'global-flycheck-mode)
-     
+         (toggle-frame-fullscreen)    
+    #+END_SRC 
+
+*** Theme
+    #+BEGIN_SRC emacs-lisp
+   (load-theme 'modus-vivendi t)  ;; theme
+    #+END_SRC
+
+*** Aesthetics
+
+    #+BEGIN_SRC emacs-lisp
+   (setq initial-scratch-message "")
+   (setq inhibit-startup-message t) ;; no intro
+   
+   (scroll-bar-mode -1) ;; disable horizontal scrollbar
+   (menu-bar-mode -1) ;; disable the menubar
+   (tool-bar-mode -1) ;; gets rid of the tool bar at the top.
+   (tooltip-mode -1) ;; disable tooltips
+   (column-number-mode t) ;; Display column number in mode line.
+   (global-visual-line-mode t) ;; Wrap words
+   (set-fringe-mode 10) ;; bordecito
+   (fset 'yes-or-no-p 'y-or-n-p) ;; Change all yes/no questions to y/n type
+   
+   ;; Set up the visible bell
+   (setq visible-bell t)
+   
+    #+END_SRC
+  
+    Lines and columns
+    #+BEGIN_SRC emacs-lisp
+      ;;          (column-number-mode)
+      ;;          (global-display-line-numbers-mode t)
+
+      ;; Disable line numbers for some modes
+      ;;          (dolist (mode '(
+      ;;          org-mode-hook 
+      ;;          shell-mode-hook
+      ;;          eshell-mode-hook)
+      ;;          (add-hook mode (lambda () (display-line-numbers-mode 0)))))
+    #+END_SRC
+    
+    Hide the mouse while typing:
+    #+BEGIN_SRC emacs-lisp
+    (setq make-pointer-invisible t)
+    #+END_SRC
+    
+    Set up the fill-column to 80 characters and set tab width to 2
+    #+BEGIN_SRC emacs-lisp
+    (setq-default fill-column 80)
+    (setq-default default-tab-width 2)
+    (setq-default indent-tabs-mode nil)
+    #+END_SRC
+
+*** Windows
+
+*** Resize window
+    #+BEGIN_SRC emacs-lisp
+      ;;          (global-set-key (kbd "C-w +") 'shrink-window-horizontally)
+      ;;          (global-set-key (kbd "C-w -") 'enlarge-window-horizontally)
+    #+END_SRC
+
+*** Winner mode
+
+    #+BEGIN_SRC emacs-lisp
+    (winner-mode 1)
+    (global-set-key (kbd "<C-c-right>") 'winner-redo)
+    (global-set-key (kbd "<C-c-left>") 'winner-undo)
+    #+END_SRC
+
+** Company
+   #+BEGIN_SRC emacs-lisp
+   (use-package company
+   :after lsp-mode
+   :hook (lsp-mode . company-mode)
+   :bind (:map company-active-map
+   ("<tab>" . company-complete-selection))
+   (:map lsp-mode-map
+   ("<tab>" . company-indent-or-complete-common))
+   :custom
+   (company-minimum-prefix-length 1)
+   ;; Provide instant autocompletion.
+   (company-idle-delay 0.0))
+   (use-package company-box
+   :hook (company-mode . company-box-mode))
+   #+END_SRC 
+** Projectile
+   #+BEGIN_SRC emacs-lisp
+   (use-package projectile
+  :diminish projectile-mode
+  :config (projectile-mode)
+  :custom ((projectile-completion-system 'ivy))
+  :bind-keymap
+  ("C-c p" . projectile-command-map)
+  :init
+  ;; NOTE: Set this to the folder where you keep your Git repos!
+  (when (file-directory-p "~/Projects/Code")
+    (setq projectile-project-search-path '("~/Projects/Code")))
+  (setq projectile-switch-project-action #'projectile-dired))
+
+(use-package counsel-projectile
+  :config (counsel-projectile-mode))
+   #+END_SRC 
+
+** lsp
+   #+BEGIN_SRC emacs-lisp
+    (use-package lsp-mode
+    :commands (lsp lsp-deferred)
+    :hook (lsp-mode . lsp-mode-setup)
+    :init
+    (setq lsp-keymap-prefix "C-c l")
+    :config
+    (lsp-enable-which-key-integration t))
+   #+END_SRC 
+   
+   #+BEGIN_SRC emacs-lisp
+    (use-package lsp-jedi
+    :ensure t
+    :config
+    (with-eval-after-load "lsp-mode"
+    (add-to-list 'lsp-disabled-clients 'pyls)
+    (add-to-list 'lsp-enabled-clients 'jedi)))
+   #+END_SRC 
+   
+   #+BEGIN_SRC emacs-lisp
+   (use-package lsp-ui)
+   :hook (lsp-mode . lsp-ui-mode)
+   :custom 
+   (lsp-ui-doc-position 'bottom))
+   ;;          (setq lsp-ui-sideline-enable t)
+   ;;          (setq lsp-ui-sideline-show-hover nil)
+   ;;          (lsp-ui-doc-show))
+   
+   (use-package lsp-treemacs
+   :config (lsp-treemacs-sync-mode 1)
+   :after lsp)
+   
+   (use-package lsp-ivy)
+   #+END_SRC
+** ORG
+   #+BEGIN_SRC emacs-lisp
+       ;; ORG
+       (require 'org)
+       (global-set-key "\C-cl" 'org-store-link)
+       (global-set-key "\C-ca" 'org-agenda)
+       (global-set-key "\C-cc" 'org-capture)
+       (global-set-key "\C-cb" 'org-switchb)
+       ;; (setq org-default-notes-file (concat org-directory "/notes.org"))
+       ;; (setq define-key global-map "\C-cc" 'org-capture)
+       ;; (setq org-default-notes-file "/home/pablinha/Dropbox/.notes.org")
+       ;; (setq org-directory "/home/pablinha/Documentos/apps/org")
+       ;; (setq org-support-shift-select t)
+   #+END_SRC 
+** Editing modes
+*** YAML
+    #+BEGIN_SRC emacs-lisp
+    (use-package yaml-mode)
+    #+END_SRC emacs-lisp
+*** Markdown
+    #+BEGIN_SRC emacs-lisp
+    (use-package markdown-mode
+    :ensure t
+    :commands (markdown-mode gfm-mode)
+    :mode (("\\.md\\'" . gfm-mode)
+           ("\\.Rmd\\'" . markdown-mode)
+           ("\\.markdown\\'" . markdown-mode))
+           :config (setq markdown-command "pandoc"))
+    #+END_SRC 
+** Progr
+*** Python
+    #+BEGIN_SRC emacs-lisp    
+    (use-package elpy
+    :init (setq python-shell-interpreter "python3")
+    :ensure t
+    :after python
+    :config (elpy-enable))
+    #+END_SRC
+
+    Virtual enviroments
+    #+BEGIN_SRC emacs-lisp
+    (use-package virtualenvwrapper
+    :config
+    (venv-initialize-interactive-shells)
+    (venv-initialize-eshell) ;; if you want eshell support
+    (setq venv-location (expand-file-name "~/.virtualenvs/"))
+    (add-hook 'python-mode-hook (lambda ()
+    (hack-local-variables)
+    (venv-workon project-venv-name))))
+    #+END_SRC
+
+*** Latex
+
+*** R/ESS
+
+*** Snippets
+    #+BEGIN_SRC emacs-lisp
+    (use-package yasnippet
+    :diminish yas-minor-mode
+    :config (yas-global-mode t))
+    #+END_SRC
+
+** Tabs
+   #+BEGIN_SRC emacs-lisp
+   ;; Do tabs right
+   (setq-default indent-tabs-mode nil)
+   (setq-default tab-width 4)
+   (setq indent-line-function 'insert-tab)
+   (setq c-basic-offset 4)
+   #+END_SRC 
+** Indenting
+   #+BEGIN_SRC emacs-lisp
+   (use-package aggressive-indent
+   :hook
+   (css-mode . aggressive-indent-mode)
+   (emacs-lisp-mode . aggressive-indent-mode)
+   (js-mode . aggressive-indent-mode)
+   (lisp-mode . aggressive-indent-mode)
+   (sgml-mode . aggressive-indent-mode)
+   :custom
+   (aggressive-indent-comments-too t)
+   :config
+   (add-to-list 'aggressive-indent-protected-commands 'comment-dwim))
+
+   (use-package highlight-indent-guides
+   :hook
+   (python-mode . highlight-indent-guides-mode)
+   (scss-mode . highlight-indent-guides-mode)
+   :custom
+   (highlight-indent-guides-method 'character))
+   
+   (use-package hl-line
+   :ensure nil
+   :hook
+   (prog-mode . hl-line-mode)
+   (special-mode . hl-line-mode)
+   (text-mode . hl-line-mode))
+   #+END_SRC 
+** Stuff
+   #+BEGIN_SRC emacs-lisp
+     ;; Automatically update buffers if file content on the disk has changed.
+     (global-auto-revert-mode t)
+
+     ;; Autofill
+     (add-hook 'text-mode-hook 'auto-fill-mode)
+
      ;;(setq-default cursor-type 'box)
      ;; Line spacing
      (setq-default line-spacing 3)
      ;; No cursor in non-selected windows
      (setq-default cursor-in-non-selected-windows nil)
-     
-     ;;    (fringe-mode '(40 . 0)) ;; bordecito
-     
+
      ;; refresh del pdf en emacs
      (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer)
      (put 'narrow-to-region 'disabled nil)
-     
-     
+
      ;; Ido
      ;; (setq ido-enable-flex-matching t)
      ;; (setq ido-everywhere t)
      ;; (ido-mode 1)
-     
+
      ;; Make dired less verbose
-     ;; (require 'dired-details)
-     ;; (setq-default dired-details-hidden-string "---")
-     ;; (dired-details-install)
-     
+     ;;    (require 'dired-details)
+     ;;   (setq-default dired-details-hidden-string "---")
+     ;;      (dired-details-install)
+
      ;; (put 'upcase-region 'disabled nil)
-     
+
      ;; save session 
-     (desktop-save-mode 1)
-     
+     (desktop-save-mode 0)
+
      ;; battery
      (display-battery-mode 1)
-     
+
      (setq make-backup-files nil)
-     
+
      ;; initial window
-     (setq initial-frame-alist
-     '((width . 102)   ; characters in a line
-     (height . 54))) ; number of lines
-     
-     ;; == Markdown ==
-     (use-package markdown-mode
-      :ensure t
-      :defer t
-      :mode (("\\.text\\'" . markdown-mode)
-             ("\\.markdown\\'" . markdown-mode)
-             ("\\.md\\'" . markdown-mode))
-      )
+     ;;(setq initial-frame-alist
+     ;;'((width . 102)   ; characters in a line
+     ;;(height . 54))) ; number of lines
 
-    (use-package flyspell
-      :defer t
-      :diminish (flyspell-mode . " φ"))
-
-    ;; Format R code
-    (use-package reformatter
-      :defer t
-      :config
-      (defconst Rscript-command "Rscript")
-      (reformatter-define styler
-        :program Rscript-command
-        :args (list "--vanilla" "-e"
-                    "con <- file(\"stdin\")
-    out <- styler::style_text(readLines(con)) 
-    close(con) 
-    out")
-        :lighter "styler"))
-
-    (provide 'init)
-
-  #+END_SRC
-
-  Switch to unified diffs by default:
-
-  #+BEGIN_SRC emacs-lisp
-  (setq diff-switches "-u")
-  #+END_SRC
-
-* Snippets
-
-  #+BEGIN_SRC emacs-lisp
-(use-package yasnippet
-  :diminish yas-minor-mode
-  :config (yas-global-mode t)
-  )
-  #+END_SRC
-
-* Git
-
-** Magit
-   #+BEGIN_SRC emacs-lisp
-   (use-package magit
-   :bind (("C-x g" . magit-status))
-   )
-   ; require is only so we can remove the vc hook:
-   (require 'vc)
-   (remove-hook 'find-file-hooks 'vc-find-file-hook) 
+     ;; Format R code
+     ;;          (use-package reformatter  
+     ;;          :defer t
+     ;;          :config
+     ;;          (defconst Rscript-command "Rscript")
+     ;;          (reformatter-define styler
+     ;;          :program Rscript-command
+     ;;          :args (list "--vanilla" "-e"
+     ;;          "con <- file(\"stdin\")
+     ;;          out <- styler::style_text(readLines(con)) 
+     ;;          close(con) 
+     ;;          out")
+     ;;          :lighter "styler"))
    #+END_SRC
    
-* Python
-  #+BEGIN_SRC emacs-lisp
-  (use-package pony-mode)
-  (use-package virtualenvwrapper
-  :config
-  (venv-initialize-interactive-shells) ;; if you want interactive shell support
-  (venv-initialize-eshell) ;; if you want eshell support
-  (setq venv-location (expand-file-name "~/.virtualenvs/"))
-  (add-hook 'python-mode-hook (lambda ()
-  (hack-local-variables)
-  (venv-workon project-venv-name))))
-  
-  (use-package jedi
-  :config (add-hook 'python-mode-hook 'jedi:setup)
-  (setq jedi:setup-keys t)                      ; optional
-  (setq jedi:complete-on-dot t)                 ; optional
-  (jedi:setup))
-  (require 'python)
-  
-  (setq python-shell-interpreter "python3")
-  
-  ;; python
-  (use-package elpy
-  :ensure t
-  :after python
-  :config
-  (elpy-enable)
-  )
-  
-  
-  
-  #+END_SRC
-  
-  
+   Switch to unified diffs by default:
+   #+BEGIN_SRC emacs-lisp
+   (setq diff-switches "-u")
+   #+END_SRC
 
-* Google
+**  Random
 
-  #+BEGIN_SRC emacs-lisp
-(use-package google-this
-  :diminish
-  :config (google-this-mode 1)
-  )
-  #+END_SRC
+*** Spelling
+    #+BEGIN_SRC emacs-lisp
+    (setq ispell-program-name "aspell")
+    (setq ispell-list-command "list")
+    #+END_SRC
 
-* Editing modes
+*** Feed 
+    
+    RSS Feeds
+    #+BEGIN_SRC emacs-lisp
+     (global-set-key (kbd "C-x w") 'elfeed)
+     (setq elfeed-feeds
+     '(("https://www.reddit.com/r/emacs/comments.rss" emacs)
+     ("https://www.infobae.com/feeds/rss/" infobae)
+     ("https://www.reddit.com/r/emacs.rss" emacs)))     
+    #+END_SRC
+    #+BEGIN_SRC emacs-lisp
+    (use-package eradio
+    :ensure t
+    :config
+    (setq eradio-channels '(("def con - soma fm" . "https://somafm.com/defcon256.pls")          ;; electronica with defcon-speaker bumpers
+    ("metal - soma fm"   . "https://somafm.com/metal130.pls")           ;; \m/
+    ("cyberia - lainon"  . "https://lainon.life/radio/cyberia.ogg.m3u") ;; cyberpunk-esque electronica
+    ("cafe - lainon"     . "https://lainon.life/radio/cafe.ogg.m3u"))))  ;; boring ambient, but with lain
 
-  #+BEGIN_SRC emacs-lisp
-(use-package markdown-mode
-  :mode (("\\.md\\'" . markdown-mode)
-         ("\\.markdown\\'" . markdown-mode))
-  :config (setq markdown-command "multimarkdown")
-        (add-hook 'markdown-mode-hook
-          (lambda ()
-            ;; disable electric indent
-            (setq-local electric-indent-mode nil)
-	    )))
-  #+END_SRC 
+    (global-set-key (kbd "C-c r p") 'eradio-play)
+    (global-set-key (kbd "C-c r s") 'eradio-stop)
+
+    #+END_SRC
+
+    [[https://github.com/olav35/eradio][Radio]]
+*** External links
+
+    Use browser depending on url
+    #+BEGIN_SRC emacs-lisp
+    (setq browse-url-browser-function
+    '(
+    ("meet.google.com" . browse-url-chrome)
+    ("thefreedictionary\\.com" . eww-browse-url)
+    ("." . browse-url-default-browser)
+    ))
+    #+END_SRC 
+    
+*** Google
+    #+BEGIN_SRC emacs-lisp
+    (use-package google-this
+    :diminish
+    :config (google-this-mode 1)
+    )
+    #+END_SRC 
+
+    #+BEGIN_SRC emacs-lisp
+    (use-package google-translate
+    :diminish
+    )
+    #+END_SRC 
+    
+    **itep
+
+** Whitespace
+   #+BEGIN_SRC emacs-lisp
+   (use-package whitespace
+   :ensure nil
+   :hook
+   (prog-mode . whitespace-mode)
+   (text-mode . whitespace-mode)
+   :custom
+   (whitespace-style '(face empty indentation::space tab trailing)))
+   #+END_SRC
+   
+
+** Pomodoro
+   #+BEGIN_SRC emacs-lisp
+     (use-package org-pomodoro
+     :after org)
+     ;;          :config
+     ;;          (setq org-pomodoro-start-sound "~/.emacs.d/sounds/focus_bell.wav")
+     ;;          (setq org-pomodoro-short-break-sound "~/.emacs.d/sounds/three_beeps.wav")
+     ;;            (setq org-pomodoro-long-break-sound "~/.emacs.d/sounds/three_beeps.wav")
+     ;;            (setq org-pomodoro-finished-sound "~/.emacs.d/sounds/meditation_bell.wav")
+
+     ;;            (dw/leader-key-def
+     ;;              "op"  '(org-pomodoro :which-key "pomodoro")))
+   #+END_SRC
+
+** Which-key
+   #+BEGIN_SRC emacs-lisp
+    (use-package which-key
+    :init (which-key-mode)
+    :diminish which-key-mode
+    :config
+    (setq which-key-idle-delay 0.2))
+   #+END_SRC  
+    
+** Commenting
+   #+BEGIN_SRC emacs-lisp
+    (use-package evil-nerd-commenter
+    :bind ("M-/" . evilnc-comment-or-uncomment-lines))
+   #+END_SRC 
+
+   ** Flystuff
+   #+BEGIN_SRC emacs-lisp
+   ;; Flycheck
+   (use-package flycheck
+   :defer t
+   :hook (lsp-mode . flycheck-mode))
+
+   (use-package flyspell
+   :defer t
+   :diminish (flyspell-mode . " φ"))
+   #+END_SRC
