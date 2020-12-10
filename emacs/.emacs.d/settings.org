@@ -7,17 +7,30 @@
 
   My Emacs configuration so far...
 
-** GNU sto 
+** GNU stow
    
+
 * Configuration
+
+** CUA-mode
+   Allows ctrl+c, ctrl+v, ctrl+z, rectangle copy-paste.
+   #+BEGIN_SRC emacs-lisp
+   (cua-mode t)
+   #+END_SRC 
+
+   When I select a region and start typing, just delete the region automatically
+   #+BEGIN_SRC emacs-lisp
+   (delete-selection-mode 1)
+   #+END_SRC
 
 ** Autotangle
 
+   Automatically tangle our Emacs.org config file when we save it
    #+BEGIN_SRC emacs-lisp
-   ;; Automatically tangle our Emacs.org config file when we save it
    (defun org-babel-tangle-config ()
    (when (string-equal (buffer-file-name)
    (expand-file-name "settings.org" user-emacs-directory))
+   
    ;; Dynamic scoping to the rescue
    (let ((org-confirm-babel-evaluate nil))
    (org-babel-tangle))))
@@ -27,12 +40,13 @@
 
 ** Parenthesis
    #+BEGIN_SRC emacs-lisp
-   (use-package rainbow-delimiters
+   (use-package rainbow-delimiters 
    :hook (prog-mode . rainbow-delimiters-mode))
-     ;;          (show-paren-mode 0)
+   ;;          (show-paren-mode 0)
    #+END_SRC 
 
-** Custom files
+** Packages and custom files
+
    M-x customize stuff
    #+BEGIN_SRC emacs-lisp
      (setq dotfiles-dir (expand-file-name "~/.emacs.d/"))
@@ -41,13 +55,7 @@
      (load custom-file))
    #+END_SRC 
 
-** Narrow
-   Enable narrowing commands.
-   #+BEGIN_SRC emacs-lisp
-     ;; (put 'narrow-to-region 'disabled nil)
-   #+END_SRC 
-
-** Packages
+   Packages
    #+BEGIN_SRC emacs-lisp
      ;; dotfiles
      (setq dotfiles-dir (expand-file-name "~/.emacs.d/"))
@@ -55,20 +63,19 @@
      (add-to-list 'load-path (concat dotfiles-dir "elpa/"))
    #+END_SRC
 
-** ESS  
+** ESS
    #+BEGIN_SRC emacs-lisp
-     (use-package ess 
-     :ensure t 
-     :init (require 'ess-site)
-     :config (setq ss-pdf-viewer-pref "xreader")
-     :mode (("\\.[rR]\\'" . R-mode)
-     ("\\.Rnw\\'" . Rnw-mode)))
-     #+END_SRC
-** Fonts
+   (use-package ess 
+   :defer t
+   ;; :config (setq ess-pdf-viewer-pref "xreader")
+   :mode (("\\.[rR]\\'" . R-mode)
+   ("\\.Rnw\\'" . Rnw-mode)))
+   #+END_SRC   
+** Fonts    
    #+BEGIN_SRC emacs-lisp
-     (set-face-attribute 'default nil :font "Hack")
+   ;;     (set-face-attribute 'default nil :font "Hack")
    #+END_SRC
-   
+  
 ** Ivy
    #+BEGIN_SRC emacs-lisp
      (use-package ivy
@@ -92,12 +99,14 @@
    
 ** Doomline
    #+BEGIN_SRC emacs-lisp
+   (use-package all-the-icons)
+
    (use-package doom-modeline
-   :ensure t
+   :defer t
    :init (doom-modeline-mode 1)
    :custom ((doom-modeline-height 15)))
    #+END_SRC
-   
+
 ** EWXM
    #+BEGIN_SRC emacs-lisp
      ;;          (require 'exwm)
@@ -119,21 +128,17 @@
    (global-font-lock-mode t)
    #+END_SRC
 
-   When I select a region and start typing, just delete the region automatically
-   #+BEGIN_SRC emacs-lisp
-   (delete-selection-mode 1)
-   #+END_SRC
-
 ** Version Control
    #+BEGIN_SRC emacs-lisp
-       (use-package vc
-       :config
-       (setq vc-follow-symlinks t)) ; Because my dotfiles are managed that way
+   (use-package vc
+   :config
+   (setq vc-follow-symlinks t)) ; Because my dotfiles are managed that way
    #+END_SRC 
 
 *** Magit
     #+BEGIN_SRC emacs-lisp
     (use-package magit
+    :defer t
     :bind (("C-x g" . magit-status))
     )
     ; require is only so we can remove the vc hook:
@@ -143,18 +148,16 @@
 
 ** Estética
 *** Pantalla 
+    Start fullscreen.
     #+BEGIN_SRC emacs-lisp
-      ;; Fullscreen
-         (toggle-frame-fullscreen)    
+    ;; (toggle-frame-fullscreen)    
     #+END_SRC 
-
 *** Theme
+    Modus vivendi theme.
     #+BEGIN_SRC emacs-lisp
-   (load-theme 'modus-vivendi t)  ;; theme
+   (load-theme 'modus-vivendi t)
     #+END_SRC
-
 *** Aesthetics
-
     #+BEGIN_SRC emacs-lisp
    (setq initial-scratch-message "")
    (setq inhibit-startup-message t) ;; no intro
@@ -170,13 +173,12 @@
    
    ;; Set up the visible bell
    (setq visible-bell t)
-   
     #+END_SRC
   
     Lines and columns
     #+BEGIN_SRC emacs-lisp
-      ;;          (column-number-mode)
-      ;;          (global-display-line-numbers-mode t)
+    (column-number-mode)
+    (global-display-line-numbers-mode t)
 
       ;; Disable line numbers for some modes
       ;;          (dolist (mode '(
@@ -185,7 +187,7 @@
       ;;          eshell-mode-hook)
       ;;          (add-hook mode (lambda () (display-line-numbers-mode 0)))))
     #+END_SRC
-    
+
     Hide the mouse while typing:
     #+BEGIN_SRC emacs-lisp
     (setq make-pointer-invisible t)
@@ -202,12 +204,11 @@
 
 *** Resize window
     #+BEGIN_SRC emacs-lisp
-      ;;          (global-set-key (kbd "C-w +") 'shrink-window-horizontally)
-      ;;          (global-set-key (kbd "C-w -") 'enlarge-window-horizontally)
+      ;; (global-set-key (kbd "C-w +") 'shrink-window-horizontally)
+      ;; (global-set-key (kbd "C-w -") 'enlarge-window-horizontally)
     #+END_SRC
 
 *** Winner mode
-
     #+BEGIN_SRC emacs-lisp
     (winner-mode 1)
     (global-set-key (kbd "<C-c-right>") 'winner-redo)
@@ -230,27 +231,45 @@
    (use-package company-box
    :hook (company-mode . company-box-mode))
    #+END_SRC 
+** Dired
+   #+BEGIN_SRC emacs-lisp
+   (use-package dired
+   :ensure nil
+   :commands (dired dired-jump)
+   :bind (("C-x C-j" . dired-jump))
+   :custom ((dired-listing-switches "-agho --group-directories-first"))
+   )
+   
+   (use-package dired-single)
+
+   (use-package all-the-icons-dired
+   :hook (dired-mode . all-the-icons-dired-mode))
+
+   #+END_SRC
+
 ** Projectile
    #+BEGIN_SRC emacs-lisp
    (use-package projectile
-  :diminish projectile-mode
-  :config (projectile-mode)
-  :custom ((projectile-completion-system 'ivy))
-  :bind-keymap
-  ("C-c p" . projectile-command-map)
-  :init
-  ;; NOTE: Set this to the folder where you keep your Git repos!
-  (when (file-directory-p "~/Projects/Code")
-    (setq projectile-project-search-path '("~/Projects/Code")))
-  (setq projectile-switch-project-action #'projectile-dired))
-
-(use-package counsel-projectile
-  :config (counsel-projectile-mode))
-   #+END_SRC 
-
+   :diminish projectile-mode
+   :config (projectile-mode)
+   :custom ((projectile-completion-system 'ivy))
+   :bind-keymap
+   ("C-c p" . projectile-command-map)
+   :init
+   ;; NOTE: Set this to the folder where you keep your Git repos!
+   (when (file-directory-p "~/Projects/Code")
+   (setq projectile-project-search-path '("~/Projects/Code")))
+   (setq projectile-switch-project-action #'projectile-dired))
+   
+   (use-package counsel-projectile
+   :config (counsel-projectile-mode))
+  #+END_SRC 
+  
 ** lsp
    #+BEGIN_SRC emacs-lisp
     (use-package lsp-mode
+    :defer t
+    :after which-key
     :commands (lsp lsp-deferred)
     :hook (lsp-mode . lsp-mode-setup)
     :init
@@ -261,7 +280,7 @@
    
    #+BEGIN_SRC emacs-lisp
     (use-package lsp-jedi
-    :ensure t
+    :defer t
     :config
     (with-eval-after-load "lsp-mode"
     (add-to-list 'lsp-disabled-clients 'pyls)
@@ -269,7 +288,8 @@
    #+END_SRC 
    
    #+BEGIN_SRC emacs-lisp
-   (use-package lsp-ui)
+   (use-package lsp-ui
+   :defer t
    :hook (lsp-mode . lsp-ui-mode)
    :custom 
    (lsp-ui-doc-position 'bottom))
@@ -278,69 +298,103 @@
    ;;          (lsp-ui-doc-show))
    
    (use-package lsp-treemacs
+   :defer t
    :config (lsp-treemacs-sync-mode 1)
    :after lsp)
    
-   (use-package lsp-ivy)
+   (use-package lsp-ivy
+   :defer t
+   )
    #+END_SRC
+
 ** ORG
    #+BEGIN_SRC emacs-lisp
-       ;; ORG
-       (require 'org)
-       (global-set-key "\C-cl" 'org-store-link)
-       (global-set-key "\C-ca" 'org-agenda)
-       (global-set-key "\C-cc" 'org-capture)
-       (global-set-key "\C-cb" 'org-switchb)
-       ;; (setq org-default-notes-file (concat org-directory "/notes.org"))
-       ;; (setq define-key global-map "\C-cc" 'org-capture)
-       ;; (setq org-default-notes-file "/home/pablinha/Dropbox/.notes.org")
-       ;; (setq org-directory "/home/pablinha/Documentos/apps/org")
-       ;; (setq org-support-shift-select t)
+     ;; ORG
+     (require 'org)
+     (global-set-key "\C-cl" 'org-store-link)
+     (global-set-key "\C-ca" 'org-agenda)
+     (global-set-key "\C-cc" 'org-capture)
+     (global-set-key "\C-cb" 'org-switchb)
+     ;; (setq load file: No such file or directory, popup t)
+     ;; (setq org-default-notes-file (concat org-directory "/notes.org"))
+     ;; (setq define-key global-map "\C-cc" 'org-capture)
+     ;; (setq org-default-notes-file "/home/pablinha/Dropbox/.notes.org")
+     ;; (setq org-directory "/home/pablinha/Documentos/apps/org")
+     ;; (setq org-support-shift-select t)
    #+END_SRC 
+
 ** Editing modes
 *** YAML
     #+BEGIN_SRC emacs-lisp
-    (use-package yaml-mode)
+    (use-package yaml-mode
+    :defer t)
     #+END_SRC emacs-lisp
+
 *** Markdown
     #+BEGIN_SRC emacs-lisp
     (use-package markdown-mode
-    :ensure t
+    :defer t
+    :ensure markdown-mode
     :commands (markdown-mode gfm-mode)
     :mode (("\\.md\\'" . gfm-mode)
            ("\\.Rmd\\'" . markdown-mode)
            ("\\.markdown\\'" . markdown-mode))
            :config (setq markdown-command "pandoc"))
     #+END_SRC 
+
 ** Progr
 *** Python
     #+BEGIN_SRC emacs-lisp    
-    (use-package elpy
-    :init (setq python-shell-interpreter "python3")
+    (use-package python-mode
     :ensure t
-    :after python
-    :config (elpy-enable))
+    :hook (python-mode . lsp-deferred)
+    :custom
+    ;; NOTE: Set these if Python 3 is called "python3" on your system!
+    (python-shell-interpreter "python3")
+    (dap-python-executable "python3")
+    (dap-python-debugger 'debugpy)
+    :config
+    (require 'dap-python))
+    
+    (use-package pyvenv
+    :config
+    (pyvenv-mode 1))
+    
+    ;; (use-package elpy
+    ;; :init (setq python-shell-interpreter "python3")
+    ;; :defer t
+    ;; :ensure t
+    ;; :after python
+    ;; :config (elpy-enable))
     #+END_SRC
-
+    
     Virtual enviroments
     #+BEGIN_SRC emacs-lisp
-    (use-package virtualenvwrapper
-    :config
-    (venv-initialize-interactive-shells)
-    (venv-initialize-eshell) ;; if you want eshell support
-    (setq venv-location (expand-file-name "~/.virtualenvs/"))
-    (add-hook 'python-mode-hook (lambda ()
-    (hack-local-variables)
-    (venv-workon project-venv-name))))
+      ;; (use-package virtualenvwrapper
+      ;; :defer t
+      ;; :config
+      ;; (venv-initialize-interactive-shells)
+      ;; (venv-initialize-eshell) ;; if you want eshell support
+      ;; (setq venv-location (expand-file-name "~/.virtualenvs/"))
+      ;; (add-hook 'python-mode-hook (lambda ()
+      ;; (hack-local-variables)
+      ;; (venv-workon project-venv-name))))
     #+END_SRC
 
 *** Latex
+
+    #+BEGIN_SRC emacs-lisp
+      ;; (setq TeX-view-program-selection '((output-pdf "Atril")))
+    #+END_SRC 
+
+
 
 *** R/ESS
 
 *** Snippets
     #+BEGIN_SRC emacs-lisp
     (use-package yasnippet
+    :defer t
     :diminish yas-minor-mode
     :config (yas-global-mode t))
     #+END_SRC
@@ -353,6 +407,7 @@
    (setq indent-line-function 'insert-tab)
    (setq c-basic-offset 4)
    #+END_SRC 
+
 ** Indenting
    #+BEGIN_SRC emacs-lisp
    (use-package aggressive-indent
@@ -381,6 +436,7 @@
    (special-mode . hl-line-mode)
    (text-mode . hl-line-mode))
    #+END_SRC 
+
 ** Stuff
    #+BEGIN_SRC emacs-lisp
      ;; Automatically update buffers if file content on the disk has changed.
@@ -444,7 +500,8 @@
    (setq diff-switches "-u")
    #+END_SRC
 
-**  Random
+
+** Random
 
 *** Spelling
     #+BEGIN_SRC emacs-lisp
@@ -453,18 +510,25 @@
     #+END_SRC
 
 *** Feed 
-    
-    RSS Feeds
+    RSS Feeds.
     #+BEGIN_SRC emacs-lisp
-     (global-set-key (kbd "C-x w") 'elfeed)
-     (setq elfeed-feeds
-     '(("https://www.reddit.com/r/emacs/comments.rss" emacs)
-     ("https://www.infobae.com/feeds/rss/" infobae)
-     ("https://www.reddit.com/r/emacs.rss" emacs)))     
+    (global-set-key (kbd "C-x w") 'elfeed)
+    (setq elfeed-feeds
+    '(("https://www.reddit.com/r/emacs/comments.rss" emacs)
+    ("https://www.infobae.com/feeds/rss/" infobae)
+    ("https://www.r-users.com/feed/?post_type=job_listing" rjobs)
+    ("https://www.reddit.com/r/emacs.rss" emacs)))     
     #+END_SRC
+
+    #+RESULTS:
+    | https://www.reddit.com/r/emacs/comments.rss         | emacs   |
+    | https://www.infobae.com/feeds/rss/                  | infobae |
+    | https://www.r-users.com/feed/?post_type=job_listing | rjobs   |
+    | https://www.reddit.com/r/emacs.rss                  | emacs   |
+    
     #+BEGIN_SRC emacs-lisp
     (use-package eradio
-    :ensure t
+    :defer t
     :config
     (setq eradio-channels '(("def con - soma fm" . "https://somafm.com/defcon256.pls")          ;; electronica with defcon-speaker bumpers
     ("metal - soma fm"   . "https://somafm.com/metal130.pls")           ;; \m/
@@ -492,19 +556,33 @@
 *** Google
     #+BEGIN_SRC emacs-lisp
     (use-package google-this
-    :diminish
+    :defer t
+    :diminish t
     :config (google-this-mode 1)
     )
     #+END_SRC 
 
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp  
     (use-package google-translate
-    :diminish
+    :defer t
+    :commands (google-translate-query-translate-reverse
+    google-translate-query-translate
+    google-translate-at-point
+    google-translate-at-point-reverse)
+    ;; :init
+    ;; (progn
+    ;; (bind-key "C-g l" 'google-translate-query-translate-reverse)
+    ;; (bind-key "C-g L" 'google-translate-query-translate)
+    ;; (bind-key "C-g K" 'google-translate-at-point)
+    ;; (bind-key "C-g k" 'google-translate-at-point-reverse)
+    ;; )
+    :config
+    (setq google-translate-default-source-language "en")
+    (setq google-translate-default-target-language "ru")
+    (org-babel-load-file "~/.emacs.d/init-google-translate.org") 
     )
-    #+END_SRC 
+    #+END_SRC     
     
-    **itep
-
 ** Whitespace
    #+BEGIN_SRC emacs-lisp
    (use-package whitespace
@@ -519,8 +597,8 @@
 
 ** Pomodoro
    #+BEGIN_SRC emacs-lisp
-     (use-package org-pomodoro
-     :after org)
+     ;; (use-package org-pomodoro
+     ;; :after org)
      ;;          :config
      ;;          (setq org-pomodoro-start-sound "~/.emacs.d/sounds/focus_bell.wav")
      ;;          (setq org-pomodoro-short-break-sound "~/.emacs.d/sounds/three_beeps.wav")
@@ -531,15 +609,17 @@
      ;;              "op"  '(org-pomodoro :which-key "pomodoro")))
    #+END_SRC
 
+
 ** Which-key
    #+BEGIN_SRC emacs-lisp
-    (use-package which-key
-    :init (which-key-mode)
-    :diminish which-key-mode
-    :config
-    (setq which-key-idle-delay 0.2))
+   (use-package which-key
+   :init (which-key-mode)
+   :diminish which-key-mode
+   :config
+   (setq which-key-idle-delay 1))
    #+END_SRC  
     
+
 ** Commenting
    #+BEGIN_SRC emacs-lisp
     (use-package evil-nerd-commenter
@@ -557,3 +637,16 @@
    :defer t
    :diminish (flyspell-mode . " φ"))
    #+END_SRC
+
+** Debugging
+
+#+BEGIN_SRC emacs-lisp
+(use-package dap-mode
+;; Uncomment the config below if you want all UI panes to be hidden by default!
+;; :custom
+;; (lsp-enable-dap-auto-configure nil)
+;; :config
+;; (dap-ui-mode 1)
+)
+#+END_SRC 
+    
