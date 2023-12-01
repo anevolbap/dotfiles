@@ -1,0 +1,7 @@
+{
+    "features": {
+        "raw_hid": true,
+        "rgb_matrix": false,
+        "oled": true
+    }
+}

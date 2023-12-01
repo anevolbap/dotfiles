@@ -1,0 +1,8 @@
+;; -*- coding: utf-8; lexical-binding: t -*-
+(define-abbrev-table 'org-mode-abbrev-table
+  '(
+    ("bgs" "" #[nil ((let ((lang (read-string "Language: " "emacs-lisp"))) (insert (format "#+begin_src %s
+
+#+end_src" lang)) (forward-line -1) (end-of-line))) nil] :count 0)
+   ))
+

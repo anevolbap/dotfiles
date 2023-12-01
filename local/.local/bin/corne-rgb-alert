@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""
+corne-rgb-alert — trigger a rainbow-blinking alert on the Corne keyboard.
+
+Sends a Raw HID packet (command 0x01) to the first QMK device that exposes
+the standard Raw HID usage page (0xFF60 / usage 0x0061).  The keyboard
+firmware then blinks through rainbow colours for ~4 seconds and restores
+the previous RGB state automatically.
+
+Requirements (Linux):
+    pip install hid          # hidapi Python bindings
+
+Udev rule (run once as root, then reload rules):
+    echo 'KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="feed", MODE="0660", GROUP="plugdev"' \
+        | sudo tee /etc/udev/rules.d/50-qmk.rules
+    sudo udevadm control --reload-rules && sudo udevadm trigger
+    sudo usermod -aG plugdev "$USER"   # log out and back in
+"""
+
+import sys
+import os
+import glob
+
+# ---------------------------------------------------------------------------
+# QMK Raw HID constants
+# ---------------------------------------------------------------------------
+QMK_USAGE_PAGE = 0xFF60
+QMK_USAGE      = 0x0061
+COMMAND_ALERT  = 0x01
+
+# Expected first bytes of the Raw HID report descriptor: Usage Page (0xFF60), Usage (0x0061)
+_RAW_HID_DESC_PREFIX = bytes([0x06, 0x60, 0xFF, 0x09, 0x61])
+
+
+def _find_keyboard_via_sysfs():
+    """Linux fallback: scan /sys to find the hidraw node whose report descriptor
+    starts with the QMK Raw HID usage page (0xFF60 / usage 0x0061)."""
+    for rd_path in glob.glob("/sys/class/hidraw/hidraw*/device/report_descriptor"):
+        try:
+            with open(rd_path, "rb") as f:
+                desc = f.read(len(_RAW_HID_DESC_PREFIX))
+            if desc == _RAW_HID_DESC_PREFIX:
+                # /sys/class/hidraw/hidrawN/device/... → /dev/hidrawN
+                hidraw_name = rd_path.split("/")[4]  # e.g. "hidraw2"
+                return f"/dev/{hidraw_name}".encode()
+        except OSError:
+            continue
+    return None
+
+
+def find_keyboard():
+    """Return the hidraw path of the first QMK Raw HID device, or None."""
+    try:
+        import hid
+    except ImportError:
+        print("corne-rgb-alert: 'hid' module not found. Install with: pip install hid", file=sys.stderr)
+        return None
+
+    for dev in hid.enumerate():
+        if dev.get("usage_page") == QMK_USAGE_PAGE and dev.get("usage") == QMK_USAGE:
+            return dev["path"]
+
+    # Linux/hidraw backend doesn't populate usage_page — fall back to sysfs.
+    if os.path.isdir("/sys/class/hidraw"):
+        return _find_keyboard_via_sysfs()
+
+    return None
+
+
+def send_alert():
+    try:
+        import hid
+    except ImportError:
+        # Already reported above; exit cleanly so the hook doesn't fail.
+        sys.exit(0)
+
+    path = find_keyboard()
+    if path is None:
+        # Keyboard not connected — fail silently so Claude Code isn't blocked.
+        sys.exit(0)
+
+    # On Linux the hidraw backend's open_path() fails with extra ioctls on the
+    # Raw HID interface; write directly to the device node instead.
+    if os.path.isdir("/sys/class/hidraw"):
+        try:
+            packet = bytes([COMMAND_ALERT]) + bytes(31)
+            with open(path, "wb") as f:
+                f.write(packet)
+        except Exception as exc:
+            print(f"corne-rgb-alert: write error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        return
+
+    try:
+        h = hid.device()
+        h.open_path(path)
+        h.set_nonblocking(True)
+
+        # Raw HID packets are 32 bytes; prepend report-ID 0x00.
+        packet = [0x00] + [0x00] * 32
+        packet[1] = COMMAND_ALERT
+        h.write(packet)
+        h.close()
+    except Exception as exc:
+        print(f"corne-rgb-alert: HID error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    send_alert()

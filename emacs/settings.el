@@ -1,0 +1,720 @@
+;;; -*- lexical-binding: t -*-
+
+(use-package eca
+  :vc (:url "https://github.com/editor-code-assistant/eca-emacs" :rev :newest))
+
+(use-package expreg
+  :ensure t)
+
+(use-package kirigami
+  :ensure t
+  :config
+  (define-prefix-command 'kirigami-command-map)
+  (global-set-key (kbd "C-c f") 'kirigami-command-map)
+  (define-key kirigami-command-map (kbd "o")   'kirigami-open-fold)
+  (define-key kirigami-command-map (kbd "O")   'kirigami-open-fold-rec)
+  (define-key kirigami-command-map (kbd "c")   'kirigami-close-fold)
+  (define-key kirigami-command-map (kbd "m")   'kirigami-close-folds)
+  (define-key kirigami-command-map (kbd "r")   'kirigami-open-folds)
+  (define-key kirigami-command-map (kbd "TAB") 'kirigami-toggle-fold))
+
+;; transmission: manage Transmission BitTorrent daemon from Emacs.
+;; Requires a running Transmission daemon:
+;;   macOS: brew install transmission-cli
+;;   Linux: sudo apt install transmission-daemon
+;; Invoke with M-x transmission.
+(use-package transmission
+  :ensure t
+  :defer t)
+
+(use-package golden-ratio
+  :ensure t
+  :demand t
+  :config
+  (golden-ratio-mode 1))
+
+;; zmq — low-level dependency for jupyter.el, load lazily
+(use-package zmq
+  :ensure t
+  :defer t)
+
+;; jupyter.el — interactive kernel sessions inside Emacs
+;; Provides: jupyter-run-repl, ob-jupyter src blocks, rich output display
+;; Requires: pip install jupyter
+(use-package jupyter
+  :ensure t
+  :defer t
+  :after zmq
+  :init
+  ;; Load ob-jupyter so #+begin_src jupyter-python blocks work in org files
+  (with-eval-after-load 'org
+    (org-babel-do-load-languages
+     'org-babel-load-languages
+     (append org-babel-load-languages
+             '((jupyter . t)))))
+  :config
+  ;; Use the Python kernel by default for jupyter src blocks
+  (setq org-babel-default-header-args:jupyter-python
+        '((:async   . "yes")
+          (:kernel  . "python3")
+          (:session . "default"))))
+
+;; code-cells — lightweight cell-based editing for .py notebooks (jupytext)
+;; Use M-x code-cells-mode in a .py file converted via: jupytext --to py:percent
+(use-package code-cells
+  :ensure t
+  :defer t)
+
+(setq scroll-preserve-screen-position t
+      scroll-margin 5)
+
+(setq window-divider-default-bottom-width 1
+      window-divider-default-right-width 1
+      window-divider-default-places 'right-only)
+(window-divider-mode 1)
+
+;; Divider colours — applied after the theme loads so they don't get
+;; overwritten by theme face resets.  Uses modus-vivendi-compatible tones.
+(with-eval-after-load 'modus-themes
+  (set-face-attribute 'fringe nil :background 'unspecified)
+  (set-face-attribute 'window-divider nil :foreground "gray30")
+  (set-face-attribute 'window-divider-first-pixel nil :foreground "gray20")
+  (set-face-attribute 'window-divider-last-pixel nil :foreground "gray40"))
+
+;; Right option key sends dead keys (accents) instead of being Meta.
+;; macOS-only variable; harmless to guard explicitly for clarity.
+;; https://www.reddit.com/r/emacs/comments/mpbgx7/
+(when (eq system-type 'darwin)
+  (setq mac-right-option-modifier 'none))
+
+;; Only run whitespace-cleanup on local file-visiting buffers.
+;; Skipping TRAMP buffers avoids unexpected slowdowns on remote saves.
+(defun ao/whitespace-cleanup-safe ()
+  (when (and buffer-file-name
+             (not (file-remote-p buffer-file-name)))
+    (whitespace-cleanup)))
+(add-hook 'before-save-hook #'ao/whitespace-cleanup-safe)
+
+;; C-q is quoted-insert (lets you insert literal control chars) — don't shadow it.
+;; C-x k already kills a buffer (with prompt); bind a no-prompt version to C-x K.
+(global-set-key (kbd "C-x K") 'kill-current-buffer)
+(global-set-key (kbd "C-c t") 'type-break)
+
+;; Displaying World Time
+(setq world-clock-list
+      '(("Etc/UTC"                          "UTC")))
+(setq world-clock-time-format "%a, %d %b %I:%M %p %Z")
+
+(use-package dired
+  :ensure nil
+  :hook (dired-mode . dired-hide-details-mode)
+  :custom
+  ;; Guess target directory when two dired windows are open (copy/move UX)
+  (dired-dwim-target t)
+  ;; Human-readable sizes (-h).
+  ;; On Linux, GNU ls supports --group-directories-first; on macOS we use
+  ;; ls-lisp (Emacs's own ls), which does not support that flag.
+  (dired-listing-switches
+   (if (eq system-type 'darwin) "-alh" "-alh --group-directories-first"))
+  ;; Auto-revert dired buffers when directory contents change
+  (dired-auto-revert-buffer t)
+  ;; Allow recursive deletes/copies without extra prompts (asks once)
+  (dired-recursive-deletes 'top)
+  (dired-recursive-copies 'always))
+
+;; On macOS use Emacs's own ls (ls-lisp) — no GNU coreutils dependency.
+;; On Linux the system GNU ls is used directly via insert-directory-program.
+(use-package ls-lisp
+  :ensure nil
+  :custom
+  (ls-lisp-use-insert-directory-program (not (eq system-type 'darwin))))
+
+(auto-save-visited-mode 1)
+(setq auto-save-timeout 10)   ; seconds idle before autosave
+(setq auto-save-interval 200) ; keystrokes between autosaves
+
+;; Redirect Emacs backup files (~) to a single directory instead of
+;; scattering them next to the original files.
+(setq backup-directory-alist
+      `(("." . ,(expand-file-name "backups/" user-emacs-directory))))
+(setq backup-by-copying t    ; don't clobber symlinks
+      delete-old-versions t
+      kept-new-versions 6
+      kept-old-versions 2
+      version-control t)     ; use versioned backup names
+
+;; savehist: persist minibuffer history across Emacs restarts.
+;; Pairs with vertico/consult to surface recently used commands/files first.
+(use-package savehist
+  :ensure nil
+  :init
+  (savehist-mode 1)
+  :custom
+  (savehist-additional-variables
+   '(search-ring regexp-search-ring kill-ring compile-history)))
+
+(use-package recentf
+  :ensure nil
+  :init
+  (recentf-mode t)
+  :custom
+  (recentf-max-saved-items 100)
+  (recentf-max-menu-items 20)
+  (recentf-auto-cleanup 'idle)  ; prune stale entries when Emacs is idle
+  (recentf-exclude
+   '(".git/"
+     "elpa/"
+     "//"
+     "straight/"
+     "elpaca/"
+     "cache/"
+     ".*cache/"))
+  :config
+  (run-with-idle-timer 30 t #'recentf-save-list))
+
+;; Automatically update buffers if file content on the disk has changed.
+(global-auto-revert-mode 1)
+(setq-default line-spacing 3)
+;; No cursor in non-selected windows
+(setq-default cursor-in-non-selected-windows nil)
+;; Cursor blinks 5 times
+(setq blink-cursor-blinks 5)
+;; Allow narrowing to a region (disabled by default as a safety measure)
+(put 'narrow-to-region 'disabled nil)
+
+;; save-place: reopen files at the last visited position.
+(save-place-mode 1)
+
+;; delete-selection: typing over an active region replaces it (standard
+;; behaviour in every other editor; off by default in Emacs).
+(delete-selection-mode 1)
+
+(use-package emacs
+  :ensure nil
+  :init
+  (setq-default mode-line-percent-position '(-3 "%p"))
+
+  ;; Disable buffer size indicator (redundant with line/col display)
+  (size-indication-mode 0)
+
+  ;; Show line and column numbers in the mode-line
+  (column-number-mode 1)
+  (line-number-mode 1)
+
+  ;; Battery: show percentage + charging icon, with % sign and spacing
+  (setq-default battery-mode-line-format " 🔋%p%% ")
+
+  ;; Time: compact 12-hour format, no load average
+  (setq-default display-time-format " %l:%M %p %b %e"
+                display-time-default-load-average nil
+                display-time-day-and-date nil)
+
+  ;; Enable time and battery display directly — with-eval-after-load 'time
+  ;; would never fire unless something else loaded the `time' library first.
+  (display-time-mode 1)
+  (display-battery-mode 1)
+
+  ;; VC branch: show just the branch name without "Git:" prefix (Emacs 30+)
+  (setq vc-display-status 'no-backend)
+
+  ;; Custom mode-line layout:
+  ;;  [*] remote  buffer-name  line:col  branch  [major + minor modes]  misc(time/battery/btc)
+  ;; mode-line-modes was previously missing — it carries the major mode name
+  ;; and all minor mode lighters (eglot, flyspell, olivetti, etc.).
+  (setq-default mode-line-format
+                '("%e"
+                  mode-line-front-space
+                  mode-line-modified
+                  mode-line-remote
+                  " "
+                  mode-line-buffer-identification
+                  " "
+                  mode-line-position
+                  (vc-mode vc-mode)
+                  "  "
+                  mode-line-modes
+                  "  "
+                  mode-line-misc-info)))
+
+;; Prefer UTF-8 everywhere; covers new files, process I/O, clipboard.
+;; set-terminal/keyboard-coding-system are no-ops in GUI Emacs 26+.
+(prefer-coding-system 'utf-8)
+(setq default-process-coding-system '(utf-8-unix . utf-8-unix))
+(setq default-buffer-file-coding-system 'utf-8)
+
+;; olivetti: visual soft-wrap at a comfortable reading width.
+;; Applied only to modes where hard wraps are unwanted (org, reading).
+;; text-mode uses auto-fill-mode (hard wraps) instead — both together
+;; would produce hard line-breaks inside olivetti's soft-wrapped lines.
+(use-package olivetti
+  :ensure t
+  :hook ((org-mode        . olivetti-mode)
+         (elfeed-show-mode . olivetti-mode)))
+
+;; auto-fill: insert hard newlines at fill-column in plain text buffers
+(add-hook 'text-mode-hook 'auto-fill-mode)
+
+(defun ao/flyspell-tree-sitter-check-p ()
+  "Return t only when point is inside a comment or string node.
+Used as `flyspell-generic-check-word-predicate' in tree-sitter modes
+where `syntax-ppss' does not reliably identify node types."
+  (when-let* ((node (treesit-node-at (point)))
+              (type (treesit-node-type node)))
+    (string-match-p "comment\\|string" type)))
+
+(defun ao/flyspell-prog-mode-ts ()
+  "Enable flyspell with a tree-sitter-aware predicate."
+  (setq-local flyspell-generic-check-word-predicate
+              #'ao/flyspell-tree-sitter-check-p)
+  (flyspell-mode 1))
+
+(use-package flyspell
+  :ensure nil
+  :hook (python-ts-mode . ao/flyspell-prog-mode-ts))
+
+;; No tabs by default; use spaces everywhere except modes that require tabs
+(setq-default indent-tabs-mode nil)
+(setq-default tab-width 4)
+(setq c-basic-offset 4)
+;; Re-enable tabs only where semantically required
+(add-hook 'makefile-mode-hook (lambda () (setq indent-tabs-mode t)))
+
+;; Insert matching parentheses automatically
+(electric-pair-mode 1)
+;; Highlight matching parentheses with zero delay
+(show-paren-mode 1)
+(setq show-paren-delay 0)
+;; Emacs 29+: show matching paren context in an overlay when off-screen
+(setq show-paren-context-when-offscreen 'overlay)
+
+(use-package hl-line
+  :ensure nil
+  :hook
+  (prog-mode . hl-line-mode)
+  (special-mode . hl-line-mode)
+  (text-mode . hl-line-mode))
+
+;; highlight-indent-guides — vertical character guides at each indent level.
+;; MELPA alternative to indent-bars (which is GitHub-only).
+;; Auto-color disabled: it fails with modus-themes. Instead we pull the
+;; guide color directly from the active modus palette after each theme load.
+(defun ao/set-indent-guide-faces ()
+  "Set highlight-indent-guides faces from the active modus theme palette."
+  (when (and (boundp 'modus-themes-common-palette-overrides)
+             (featurep 'highlight-indent-guides))
+    (modus-themes-with-colors
+      (set-face-attribute 'highlight-indent-guides-character-face nil
+                          :foreground bg-active)
+      (set-face-attribute 'highlight-indent-guides-top-character-face nil
+                          :foreground fg-dim)
+      (set-face-attribute 'highlight-indent-guides-stack-character-face nil
+                          :foreground bg-active))))
+
+(use-package highlight-indent-guides
+  :ensure t
+  :hook (prog-mode . highlight-indent-guides-mode)
+  :custom
+  (highlight-indent-guides-method 'character)
+  (highlight-indent-guides-auto-enabled nil)
+  :config
+  (ao/set-indent-guide-faces)
+  (add-hook 'modus-themes-after-load-theme-hook #'ao/set-indent-guide-faces))
+
+(use-package emacs
+  :ensure nil
+  :custom
+  (window-sides-vertical t)
+  :config
+  ;; Group visual-mode settings for better startup
+  (push '(menu-bar-lines . 0) default-frame-alist)
+  (push '(tool-bar-lines . 0) default-frame-alist)
+  (push '(vertical-scroll-bars) default-frame-alist)
+
+  (setq-default initial-scratch-message ""
+                inhibit-startup-message t
+                visible-bell t)
+
+  ;; pixel-scroll-precision-mode moved to gui-config.el (GUI only)
+  ;; Accept y/n instead of yes/no everywhere (Emacs 28+; replaces fset hack)
+  (setq use-short-answers t))
+
+;; Relative line numbers in prog-mode (useful with evil/avy jumps).
+;; Disabled in text/org modes where line numbers add visual clutter.
+(defun ao/enable-relative-line-numbers ()
+  (display-line-numbers-mode t)
+  (setq-local display-line-numbers 'relative))
+
+(defun ao/disable-line-numbers ()
+  (display-line-numbers-mode -1))
+
+(add-hook 'prog-mode-hook 'ao/enable-relative-line-numbers)
+(add-hook 'text-mode-hook 'ao/disable-line-numbers)
+(add-hook 'org-mode-hook 'ao/disable-line-numbers)
+
+;; winner-mode: C-c <left>/<right> to undo/redo window layout changes.
+;; These are the default winner bindings — setting them explicitly for clarity.
+(winner-mode 1)
+(global-set-key (kbd "C-c <right>") 'winner-redo)
+(global-set-key (kbd "C-c <left>")  'winner-undo)
+
+(use-package emacs
+  :ensure nil
+  :init
+  (require-theme 'modus-themes) ; `require-theme' is ONLY for the built-in Modus themes
+  :config
+  ;; Add all your customizations prior to loading the themes
+  (setq modus-themes-italic-constructs t
+        modus-themes-bold-constructs nil)
+
+  ;; Load the theme of your choice.
+  (modus-themes-load-theme 'modus-vivendi)
+
+  (define-key global-map (kbd "<f5>") #'modus-themes-toggle))
+
+(use-package ace-window
+  :ensure t
+  :bind ("M-o" . ace-window)
+  :custom
+  ;; Use home-row keys instead of numbers for window labels
+  (aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l)))
+
+;; which-key is built-in since Emacs 30 — no package install needed.
+(setq which-key-idle-delay 0.3
+      which-key-sort-order 'which-key-description-order)
+(which-key-mode)
+
+;; password-store-otp — OTP support for pass (MELPA)
+(use-package password-store-otp
+  :ensure t)
+
+;; password-store-menu — quick menu for pass entries (MELPA)
+(use-package password-store-menu
+  :ensure t
+  :config (password-store-menu-enable)
+  :custom (password-store-menu-key "C-c p"))
+
+;; pass — UI for password-store; C-c p is bound by password-store-menu above
+(use-package pass
+  :ensure t
+  :after password-store-otp
+  :defer t)
+
+(use-package kotlin-mode
+  :mode "\\.kt\\'")
+
+;; git-link: generate shareable GitHub/GitLab URLs for the current file/line
+(use-package git-link)
+
+;; Switch to unified diffs by default (alternative is context "-c")
+(setq diff-switches "-u")
+(setq ediff-keep-variants nil)
+(setq ediff-split-window-function 'split-window-horizontally)
+(setq ediff-window-setup-function 'ediff-setup-windows-plain)
+
+(use-package magit
+  :config
+  (setq magit-diff-refine-hunk nil)
+  (setq magit-process-apply-ansi-colors t))
+  ;; magit-format-file-nerd-icons set in gui-config.el
+
+;; magit-todos: show TODO/FIXME entries from the repo in the magit status buffer.
+(use-package magit-todos
+  :after magit
+  :config
+  (magit-todos-mode 1)
+  (setq magit-todos-exclude-globs '(".git/" "*.ipynb")))
+
+;; forge: GitHub/GitLab integration — PRs, issues, notifications inside magit.
+;; Requires a token in ~/.authinfo.gpg with these GitHub scopes:
+;;   repo (full read/write), user (profile info), read:org (org membership).
+(use-package forge
+  :after magit
+  :config
+  (setq auth-sources '("~/.authinfo.gpg")))
+
+;; pr-review: review GitHub PRs with a dedicated diff/comment UI.
+;; Invoke with M-x pr-review or from forge's issue list.
+(use-package pr-review
+  :after magit)
+
+(use-package numpydoc
+  :ensure t
+  :after python
+  :bind (:map python-ts-mode-map
+              ("C-c C-n" . numpydoc-generate)))
+
+(use-package dape
+  :ensure t
+  :preface
+  ;; By default dape shares the same keybinding prefix as `gud'
+  ;; If you do not want to use any prefix, set it to nil.
+  (setq dape-key-prefix "\C-x\C-a")
+
+  :hook
+  ;; Save breakpoints on quit
+  (kill-emacs . dape-breakpoint-save)
+  ;; Load breakpoints on startup
+  (after-init . dape-breakpoint-load)
+
+  :custom
+  ;; Turn on global bindings for setting breakpoints with mouse
+  (dape-breakpoint-global-mode t)
+
+  ;; Info buffers to the right
+  (dape-buffer-window-arrangement 'right)
+
+  ;; Enable inline variable display
+  (dape-inline-variables t)
+
+  :config
+  ;; Pulse source line (slight performance hit)
+  (add-hook 'dape-display-source-hook #'pulse-momentary-highlight-one-line)
+
+  ;; Save buffers on startup, useful for interpreted languages
+  (add-hook 'dape-start-hook (lambda () (save-some-buffers t t)))
+
+  ;; Kill compile buffer on build success
+  (add-hook 'dape-compile-hook #'kill-buffer)
+
+  ;; =========================================================================
+  ;; Python Debugging Configurations
+  ;; =========================================================================
+
+  ;; 1. Standard Python debugging with debugpy
+  (add-to-list 'dape-configs
+               `(debugpy-module
+                 modes (python-mode python-ts-mode)
+                 ensure dape-ensure-command
+                 command "python"
+                 command-args ("-m" "debugpy.adapter")
+                 :type "executable"
+                 :request "launch"
+                 :cwd dape-cwd-fn
+                 :program dape-buffer-default
+                 fn dape-config-autoport))
+
+  ;; 2. Python debugging with uv
+  (add-to-list 'dape-configs
+               `(debugpy-uv
+                 modes (python-mode python-ts-mode)
+                 ensure dape-ensure-command
+                 command "uv"
+                 command-args ("run" "python" "-m" "debugpy.adapter")
+                 :type "executable"
+                 :request "launch"
+                 :cwd dape-cwd-fn
+                 :program dape-buffer-default
+                 fn dape-config-autoport))
+
+  ;; 3. Python debugging with command-line arguments
+  (add-to-list 'dape-configs
+               `(debugpy-args
+                 modes (python-mode python-ts-mode)
+                 ensure dape-ensure-command
+                 command "python"
+                 command-args ("-m" "debugpy.adapter")
+                 :type "executable"
+                 :request "launch"
+                 :cwd dape-cwd-fn
+                 :program dape-buffer-default
+                 :args ,(lambda ()
+                          (split-string
+                           (read-string "Program arguments: " "") " "))
+                 fn dape-config-autoport))
+
+  ;; 4. pytest debugging
+  (add-to-list 'dape-configs
+               `(debugpy-pytest
+                 modes (python-mode python-ts-mode)
+                 ensure dape-ensure-command
+                 command "python"
+                 command-args ("-m" "debugpy.adapter")
+                 :type "executable"
+                 :request "launch"
+                 :module "pytest"
+                 :args [,(lambda ()
+                           (if-let ((file (buffer-file-name)))
+                               (vector file)
+                             (vector)))]
+                 :cwd dape-cwd-fn
+                 fn dape-config-autoport))
+
+  ;; 5. pytest with uv
+  (add-to-list 'dape-configs
+               `(debugpy-pytest-uv
+                 modes (python-mode python-ts-mode)
+                 ensure dape-ensure-command
+                 command "uv"
+                 command-args ("run" "python" "-m" "debugpy.adapter")
+                 :type "executable"
+                 :request "launch"
+                 :module "pytest"
+                 :args [,(lambda ()
+                           (if-let ((file (buffer-file-name)))
+                               (vector file)
+                             (vector)))]
+                 :cwd dape-cwd-fn
+                 fn dape-config-autoport))
+
+  ;; 6. Debug specific pytest function
+  (add-to-list 'dape-configs
+               `(debugpy-pytest-function
+                 modes (python-mode python-ts-mode)
+                 ensure dape-ensure-command
+                 command "python"
+                 command-args ("-m" "debugpy.adapter")
+                 :type "executable"
+                 :request "launch"
+                 :module "pytest"
+                 :args [,(lambda ()
+                           (let ((file (buffer-file-name))
+                                 (func (ao/python-pytest-current-defun)))
+                             (if (and file func)
+                                 (vector (concat file "::" func))
+                               (vector file))))]
+                 :cwd dape-cwd-fn
+                 fn dape-config-autoport))
+
+  ;; Additional keybindings (supplement gud-style prefix bindings)
+  :bind (("C-c d d" . dape)
+         ("C-c d b" . dape-breakpoint-toggle)))
+
+;; Helper function for pytest current function
+(defun ao/python-pytest-current-defun ()
+  "Get current test function name."
+  (save-excursion
+    (when (re-search-backward "^\\s-*def \\(test_[^(]+\\)" nil t)
+      (match-string 1))))
+
+;; docker.el — manage Docker containers/images from Emacs (MELPA)
+;; C-c d is taken by dape; invoke via M-x docker
+(use-package docker
+  :ensure t
+  :defer t)
+
+;; AUCTeX settings — wrapped so they only apply when AUCTeX is loaded.
+;; Install AUCTeX via elpaca if needed: (use-package auctex :ensure t)
+(with-eval-after-load 'latex
+  ;; PDF viewers — platform-specific:
+  ;;   macOS: "open" (Preview) or Skim for forward/inverse search
+  ;;   Linux: evince (GNOME) or zathura (lightweight)
+  (setq TeX-view-program-list
+        '(("Open"    "open %o")
+          ("Skim"    "/Applications/Skim.app/Contents/SharedSupport/displayline -b -g %n %o %b")
+          ("Evince"  "evince %o")
+          ("Zathura" "zathura %o")))
+  (setq TeX-view-program-selection
+        (if (eq system-type 'darwin)
+            '((output-pdf "Open"))
+          '((output-pdf "Evince"))))
+  (setq TeX-PDF-mode t)
+  ;; Refresh the PDF buffer after compilation
+  (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer)
+  (add-hook 'LaTeX-mode-hook 'visual-line-mode)
+  (add-hook 'LaTeX-mode-hook 'LaTeX-math-mode)
+  (add-hook 'LaTeX-mode-hook 'TeX-source-correlate-mode)
+  (add-hook 'LaTeX-mode-hook 'turn-on-reftex))
+
+(use-package project
+  :ensure nil
+  :custom
+  (project-vc-extra-root-markers '(".project"))
+  (project-switch-commands
+   '((project-find-file "Find file")
+     (project-find-regexp "Find regexp")
+     (project-find-dir "Find directory")
+     (project-eshell "Eshell" "e")
+     (magit-project-status "Magit" "m")
+     (ao/uv-project-run "uv" "u")))
+
+  :config
+  ;; Helper macro for project-aware commands
+  (defmacro ao/define-project-command (name docstring command)
+    "Define a project-aware command that runs COMMAND in project root."
+    `(defun ,name ()
+       ,docstring
+       (interactive)
+       (let* ((project (project-current t))
+              (root (and project (project-root project))))
+         (if root
+             (let ((default-directory root))
+               (call-interactively ,command))
+           (user-error "Not in a project")))))
+
+  ;; Define project commands using the macro
+  (ao/define-project-command ao/project-eshell
+    "Run Eshell in the current project's root directory."
+    #'eshell)
+
+  (ao/define-project-command ao/uv-project-run
+    "Run uv in the current project's root directory."
+    #'(lambda () (interactive) (compile "uv run ")))
+
+  ;; Override the original project-eshell
+  (advice-add 'project-eshell :override #'ao/project-eshell))
+
+(use-package webjump
+  :ensure nil
+  :bind ("C-c w" . webjump)
+  :config
+  (setq webjump-sites (ao/read-from-file (concat user-emacs-directory "webjump-sites"))))
+
+(use-package elfeed
+  :bind ("C-x w" . elfeed)
+  :config
+  (setq elfeed-feeds (ao/read-from-file (expand-file-name "rss-feeds" user-emacs-directory))))
+
+;; eradio — simple internet radio player (MELPA); requires mpv (brew install mpv)
+(use-package eradio
+  :bind (("C-c r p" . eradio-play)
+         ("C-c r s" . eradio-stop))
+  :config
+  (setq eradio-player '("mpv" "--no-video"))
+  (setq eradio-channels (ao/read-from-file (expand-file-name "radios" user-emacs-directory))))
+
+(defun ao/my-search-radio-browser (country)
+  "Search for radio stations by country on radio-browser.info."
+  (interactive "sCountry (e.g., Japan): ")
+  (browse-url
+   (format "https://www.radio-browser.info/search?country=%s&hidebroken=true&order=votes&reverse=true"
+           (url-hexify-string country))))
+
+;; vterm — full terminal emulator (needs libvterm; brew install libvterm)
+;; Use when you need a real PTY (ssh, curses apps, etc.).
+;; For Lisp-aware shell use eshell (configured in eshell-config.el).
+(use-package vterm
+  :ensure t
+  :bind ("C-c v" . vterm))
+
+(setq tramp-default-method "ssh")
+
+;; docker pull zevlg/telega-server:latest
+(use-package telega
+  :init (setq telega-use-docker t))
+
+(use-package claude-code-ide
+  :vc (:url "https://github.com/manzaltu/claude-code-ide.el" :rev :newest)
+  :bind ("C-c C-'" . claude-code-ide-menu) ; Set your favorite keybinding
+  :config
+  (claude-code-ide-emacs-tools-setup)) ; Optionally enable Emacs MCP tools
+
+;; https://github.com/s-kostyaev/ellama
+;; curl -fsSL https://ollama.com/install.sh | sh
+;; Requires the `llm' package (pulled as a dependency of ellama).
+(use-package ellama
+  :ensure t
+  :commands (ellama-chat ellama-ask-about ellama-summarize)
+  :config
+  (setopt ellama-language "Spanish")
+  ;; llm-ollama is part of the llm package; require only after ellama loads.
+  (require 'llm-ollama)
+  (setopt ellama-provider
+          (make-llm-ollama
+           :chat-model "deepseek-r1" :embedding-model "deepseek-r1")))
+
+;; Redirect backup and auto-save files to ~/.emacs.d/ so they never
+;; scatter tilde files across project directories.
+(setq backup-directory-alist `(("." . ,(concat user-emacs-directory "backups"))))
+(setq auto-save-file-name-transforms `((".*" ,(concat user-emacs-directory "auto-saves/") t)))
+(make-directory (concat user-emacs-directory "backups") t)
+(make-directory (concat user-emacs-directory "auto-saves") t)

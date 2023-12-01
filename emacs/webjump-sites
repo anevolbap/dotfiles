@@ -1,0 +1,6 @@
+(
+	("Emacs Home Page" . "www.gnu.org/software/emacs/emacs.html")
+	("DuckDuckGo" . [simple-query "duckduckgo.com" "duckduckgo.com/?q=" ""])
+	("google" . [simple-query "google.com" "google.com/?q=" ""])
+	("Wikipedia" . [simple-query "wikipedia.org" "wikipedia.org/wiki/" ""])
+)

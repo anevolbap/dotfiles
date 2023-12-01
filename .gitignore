@@ -1,0 +1,26 @@
+# Emacs backup and lock files
+*.*~
+\#*\#
+.#*
+
+# Eshell runtime state
+emacs/eshell/history
+emacs/eshell/lastdir
+emacs/eshell/profile~
+
+# Elpaca package cache (hundreds of MB, regenerated on first run)
+emacs/elpaca/
+
+# Machine-local customizations written by M-x customize
+emacs/custom.el
+
+# Runtime state files (regenerated automatically)
+emacs/recentf
+emacs/bookmarks
+emacs/tramp
+emacs/url/
+emacs/transient/
+
+# macOS metadata
+.DS_Store
+emacs/.DS_Store
