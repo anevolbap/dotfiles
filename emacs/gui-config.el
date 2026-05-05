@@ -25,6 +25,15 @@
 (set-face-attribute 'window-divider-first-pixel nil :foreground "gray40")
 (set-face-attribute 'window-divider-last-pixel nil :foreground "red")
 
+;; Slightly shorter mode-line to reclaim vertical space.
+(set-face-attribute 'mode-line          nil :height 0.85)
+(set-face-attribute 'mode-line-inactive nil :height 0.85)
+
+;; Let markdown code blocks use the buffer's default (variable-pitch) font
+;; instead of forcing monospace — org-mode/markdown bodies read better that way.
+(with-eval-after-load 'markdown-mode
+  (set-face-attribute 'markdown-code-face nil :inherit 'default))
+
 ;; ============================================================================
 ;; macOS option key
 ;; ============================================================================
