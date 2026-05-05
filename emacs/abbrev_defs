@@ -3,6 +3,6 @@
   '(
     ("bgs" "" #[nil ((let ((lang (read-string "Language: " "emacs-lisp"))) (insert (format "#+begin_src %s
 
-#+end_src" lang)) (forward-line -1) (end-of-line))) nil] :count 0)
+#+end_src" lang)) (forward-line -1) (end-of-line))) (t)] :count 0)
    ))
 
