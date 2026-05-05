@@ -20,6 +20,17 @@
 : [nil 27060 23135 175703 nil elpaca-process-queues nil nil 0 nil]
 
 * packages
+** bt
+#+begin_src emacs-lisp
+(defun ao/bluetooth-open ()
+  "Open the Bluetooth device list and show key hints in the echo area."
+  (interactive)
+  (bluetooth-list-devices)
+  (message "c:connect  d:disconnect  P:pair  r/R:scan  i:info  A:adapter  k:remove"))
+
+(use-package bluetooth
+  :bind ("C-c b" . ao/bluetooth-open))
+#+end_src
 ** Expreg
 #+begin_src emacs-lisp
   (use-package expreg

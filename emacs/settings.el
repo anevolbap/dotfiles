@@ -3,6 +3,15 @@
 (use-package eca
   :vc (:url "https://github.com/editor-code-assistant/eca-emacs" :rev :newest))
 
+(defun ao/bluetooth-open ()
+  "Open the Bluetooth device list and show key hints in the echo area."
+  (interactive)
+  (bluetooth-list-devices)
+  (message "c:connect  d:disconnect  P:pair  r/R:scan  i:info  A:adapter  k:remove"))
+
+(use-package bluetooth
+  :bind ("C-c b" . ao/bluetooth-open))
+
 (use-package expreg
   :ensure t)
 
