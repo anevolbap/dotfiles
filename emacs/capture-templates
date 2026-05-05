@@ -1,42 +1,27 @@
 (
- ("e" "Event" entry
-      (function (lambda () 
-        (goto-char (point-min))
-        (outline-next-heading)))
-      "* %^{Event Title}\n:PROPERTIES:\n:DATE: %^T\n:END:\n%?"
-      :empty-lines 1)
- ;; ("c" "Cookbook" entry (file "cookbook.org")
- ;;      "%(org-chef-get-recipe-from-url)"
- ;;      :empty-lines 1)
- ;; ("m" "Manual Cookbook" entry (file "cookbook.org")
- ;;      "* %^{Recipe title: }\n  :PROPERTIES:\n  :source-url:\n  :servings:\n  :prep-time:\n  :cook-time:\n  :ready-in:\n  :END:\n** Ingredients\n   %?\n** Directions\n\n")
- ("m" "Memorandum of conversation" entry
-	  (file+headline "meetings.org" "Meetings")
-	  "* %t - %^{Title}\n SCHEDULED: %T\n:PROPERTIES:\n:RELATED_PROJECT: %^{Project}\n:ATTENDEES: %^{Attendees}\n:END:\n\n%?\n"
-	  :empty-lines-after 1
-	  :prepend t)
- ("s" "Code Snippet" entry
-      (file+headline "snippets.org" "💾 Snippets")
-      ;; Prompt for tag and language
+ ;; --- Task ---
+ ;; Captures go to the inbox undated. Add SCHEDULED/DEADLINE during review
+ ;; with C-c C-s / C-c C-d from the entry.
+ ("t" "TODO" entry
+      (file+headline "tasks.org" "Tasks to be reviewed")
+      "* TODO %^{Title}\n:PROPERTIES:\n:CAPTURED: %U\n:END:\n\n%i%l%?"
+      :empty-lines-after 1)
+
+ ;; --- Meeting notes (file stays in for_review/) ---
+ ("m" "Meeting notes" entry
+      (file+headline "for_review/meetings.org" "Meetings")
+      "* %^{Title} %t\n:PROPERTIES:\n:RELATED_PROJECT: %^{Project}\n:ATTENDEES: %^{Attendees}\n:END:\n\n%?"
+      :prepend t :empty-lines-after 1)
+
+ ;; --- Snippet / trick (file stays in for_review/) ---
+ ("s" "Snippet / trick" entry
+      (file+headline "for_review/snippets.org" "💾 Snippets")
       "* %?\t%^g\n#+begin_src %^{language}\n\n#+end_src")
- ("t" "Basic task for future review" entry
-	  (file+headline "tasks.org" "Tasks to be reviewed")
-	  "* %^{Title}\n:PROPERTIES:\n:CAPTURED: %U\n:END:\n\n%i%l%?\n"
-	  :empty-lines-after 1)
- ("c" "Clock in to a task" entry
-	  (file+headline "tasks.org" "Clocked tasks")
-	  "* TODO %^{Title}\n SCHEDULED: %T\n :PROPERTIES:\n :EFFORT: %^{Effort estimate in inutes|5|10|15|30|45|60|90|120}\n :END:\n\n %a\n"
-	  :prepend t
-	  :clock-in t
-	  :clock-keep t
-	  :immediate-finish t
-	  :empty-lines-after 1)
- ;; ("e" "Email note" entry
- ;; 	  (file+headline "tasks.org" "Tasks to be reviewed")
- ;; 	  ,(concat "* MAYBE %:subject :mail:\n"
- ;; 	           ":PROPERTIES:\n"
- ;; 	           ":CAPTURED: %U\n"
- ;; 	           ":END:\n\n"
- ;; 	           "%a\n%i%?")
- ;; 	  :empty-lines-after 1)
+
+ ;; --- Event ---
+ ("e" "Event" entry
+      (file+headline "events.org" "Events")
+      "* %^{Event Title}\n%^T\n%?"
+      :empty-lines 1)
+
  )
