@@ -55,8 +55,16 @@
 (load (concat user-emacs-directory "settings.el"))
 
 ;; GUI-only configuration (fonts, icons, pixel scrolling, etc.)
-(when (display-graphic-p)
-  (load (concat user-emacs-directory "gui-config.el")))
+;; In daemon mode display-graphic-p is nil at startup, so defer to frame creation.
+(add-hook 'after-make-frame-functions
+          (lambda (frame)
+            (when (and (display-graphic-p frame)
+                       (not (featurep 'gui-config)))
+              (with-selected-frame frame
+                (load (concat user-emacs-directory "gui-config.el"))))))
+(unless (daemonp)
+  (when (display-graphic-p)
+    (load (concat user-emacs-directory "gui-config.el"))))
 
 ;; ESC to escape (along with C-g)
 (global-set-key (kbd "<escape>") 'keyboard-escape-quit)
