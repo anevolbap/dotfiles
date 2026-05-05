@@ -602,12 +602,12 @@ where `syntax-ppss' does not reliably identify node types."
                  :program dape-buffer-default
                  fn dape-config-autoport))
 
-  ;; 2. Python debugging with uv
+  ;; 2. Python debugging with Poetry
   (add-to-list 'dape-configs
-               `(debugpy-uv
+               `(debugpy-poetry
                  modes (python-mode python-ts-mode)
                  ensure dape-ensure-command
-                 command "uv"
+                 command "poetry"
                  command-args ("run" "python" "-m" "debugpy.adapter")
                  :type "executable"
                  :request "launch"
@@ -648,12 +648,12 @@ where `syntax-ppss' does not reliably identify node types."
                  :cwd dape-cwd-fn
                  fn dape-config-autoport))
 
-  ;; 5. pytest with uv
+  ;; 5. pytest with Poetry
   (add-to-list 'dape-configs
-               `(debugpy-pytest-uv
+               `(debugpy-pytest-poetry
                  modes (python-mode python-ts-mode)
                  ensure dape-ensure-command
-                 command "uv"
+                 command "poetry"
                  command-args ("run" "python" "-m" "debugpy.adapter")
                  :type "executable"
                  :request "launch"
@@ -734,7 +734,7 @@ where `syntax-ppss' does not reliably identify node types."
      (project-find-dir "Find directory")
      (project-eshell "Eshell" "e")
      (magit-project-status "Magit" "m")
-     (ao/uv-project-run "uv" "u")))
+     (ao/poetry-project-run "Poetry" "p")))
 
   :config
   ;; Helper macro for project-aware commands
@@ -755,9 +755,9 @@ where `syntax-ppss' does not reliably identify node types."
     "Run Eshell in the current project's root directory."
     #'eshell)
 
-  (ao/define-project-command ao/uv-project-run
-    "Run uv in the current project's root directory."
-    #'(lambda () (interactive) (compile "uv run ")))
+  (ao/define-project-command ao/poetry-project-run
+    "Run Poetry in the current project's root directory."
+    #'poetry)
 
   ;; Override the original project-eshell
   (advice-add 'project-eshell :override #'ao/project-eshell))
