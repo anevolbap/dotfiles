@@ -92,10 +92,29 @@
   (org-agenda-current-time-string "◀── now")
 
   ;; Custom agenda commands
-  ;; Note: priority grouping is handled by org-super-agenda-groups,
-  ;; so the "A" view only needs agenda + deadline blocks.
   (org-agenda-custom-commands
-   '(("l" "Reading list" tags-todo "read")
+   '(("d" "Dashboard"
+      ((ao/dashboard-upcoming-block)
+       (tags-todo "+read"
+                  ((org-agenda-overriding-header "Reading list (top 5)")
+                   (org-agenda-sorting-strategy '(todo-state-up priority-down))
+                   (org-agenda-max-entries 5)))
+       (tags-todo "-read"
+                  ((org-agenda-overriding-header "Active TODOs (top 5 by latest update)")
+                   (org-agenda-sorting-strategy '(tsia-down))
+                   (org-agenda-max-entries 5)))))
+     ("l" "Reading list" tags-todo "read")
+     ("u" "Upcoming (next 14 days)"
+      ((agenda "" ((org-agenda-span 14)
+                   (org-agenda-start-on-weekday nil)
+                   (org-agenda-show-all-dates nil)
+                   (org-deadline-warning-days 0)
+                   (org-agenda-entry-types '(:scheduled :deadline :timestamp))
+                   (org-agenda-time-grid nil)
+                   (org-agenda-overriding-header "\nUpcoming (+14d)\n")))))
+     ("t" "All active TODOs"
+      ((todo "TODO|IN-PROGRESS|WAITING"
+             ((org-agenda-overriding-header "\nActive TODOs\n")))))
      ("A" "Daily agenda and top priority tasks"
       ((agenda "" ((org-agenda-span 1)
                    (org-deadline-warning-days 0)
@@ -109,9 +128,9 @@
                    (org-agenda-span 14)
                    (org-agenda-show-all-dates nil)
                    (org-deadline-warning-days 365)
-                   (org-agenda-entry-types '(:deadline))
+                   (org-agenda-entry-types '(:scheduled :deadline))
                    (org-agenda-time-grid nil)
-                   (org-agenda-overriding-header "\nUpcoming deadlines (+14d)\n")))))))
+                   (org-agenda-overriding-header "\nUpcoming (+14d)\n")))))))
 
   :config
   (add-to-list 'org-modules 'org-habit t)
@@ -130,6 +149,29 @@
         (insert (format "#+begin_src %s\n\n#+end_src" lang))
         (forward-line -1)
         (end-of-line)))))
+
+;; Dashboard: upcoming agenda block that always inserts its section header.
+;; An (agenda "") block silently omits its overriding-header when it produces
+;; no entries; this wrapper inserts the header unconditionally.
+(defun ao/dashboard-upcoming-block (&optional _match)
+  "14-day deadline/scheduled block: always shows its header even when empty."
+  (let ((org-agenda-span 14)
+        (org-agenda-start-on-weekday nil)
+        (org-agenda-show-all-dates nil)
+        (org-deadline-warning-days 0)
+        (org-scheduled-past-days 0)
+        (org-agenda-entry-types '(:deadline :scheduled))
+        (org-agenda-time-grid nil)
+        (org-agenda-overriding-header nil))
+    (let ((inhibit-read-only t))
+      (goto-char (point-max))
+      (insert "Upcoming (14 days)\n"))
+    (let ((before (point-max)))
+      (org-agenda-list)
+      (when (= (point-max) before)
+        (let ((inhibit-read-only t))
+          (goto-char (point-max))
+          (insert "  (no items)\n"))))))
 
 ;; ============================================================================
 ;; org-download — drag-and-drop / paste images into org files
@@ -161,13 +203,21 @@
   :ensure t
   ;; Defer until first roam command — avoids starting the SQLite DB watcher
   ;; on every startup when no roam files are being visited.
-  :commands (org-roam-node-find org-roam-node-insert org-roam-buffer-toggle)
+  :commands (org-roam-node-find org-roam-node-insert org-roam-buffer-toggle
+             org-roam-dailies-capture-today org-roam-dailies-goto-today)
   :custom
   (org-roam-directory (concat my-org-directory "/roam-notes"))
+  (org-roam-dailies-directory "daily/")
+  (org-roam-dailies-capture-templates
+   '(("d" "default" entry "* %U %?"
+      :target (file+head "%<%Y-%m-%d>.org" "#+title: %<%Y-%m-%d>\n"))))
   :bind (("C-c n l" . org-roam-buffer-toggle)
          ("C-c n f" . org-roam-node-find)
-         ("C-c n i" . org-roam-node-insert))
+         ("C-c n i" . org-roam-node-insert)
+         ("C-c n j" . org-roam-dailies-capture-today)
+         ("C-c n t" . org-roam-dailies-goto-today))
   :config
+  (require 'org-roam-dailies)
   (org-roam-db-autosync-mode))
 
 ;; ============================================================================
@@ -207,22 +257,8 @@
   :ensure t
   :after org-agenda
   :custom
-  (org-super-agenda-groups
-   '((:name "Today"
-      :time-grid t
-      :date today
-      :scheduled today)
-     (:name "Overdue"
-      :deadline past
-      :scheduled past)
-     (:name "Priority A"
-      :priority "A")
-     (:name "Priority B/C"
-      :priority<= "B")
-     (:name "Upcoming deadlines"
-      :deadline future)
-     (:name "Other"
-      :anything t)))
+  ;; No global grouping — each custom command sets its own org-super-agenda-groups.
+  (org-super-agenda-groups nil)
   :config
   (org-super-agenda-mode))
 
@@ -242,6 +278,67 @@
   ;; Make done items clearly de-emphasised
   (set-face-attribute 'org-agenda-done nil
                       :strike-through t))
+
+;; Show empty agenda blocks with a placeholder so the section header is
+;; still visible (org-agenda hides empty block bodies otherwise).
+(defun ao/agenda-mark-empty-blocks ()
+  "Insert \"  (no items)\" under any empty block in the current agenda.
+A block is considered empty when its header line is immediately followed
+by another block-separator line (or end of buffer)."
+  (when (and (eq major-mode 'org-agenda-mode)
+             (characterp org-agenda-block-separator))
+    (let* ((sep (char-to-string org-agenda-block-separator))
+           (sep-re (concat "^" (regexp-quote sep) "+$"))
+           (inhibit-read-only t)
+           (mark-empty
+            (lambda ()
+              (let ((header-end (line-end-position)))
+                (forward-line 1)
+                (when (or (eobp) (looking-at-p sep-re))
+                  (goto-char header-end)
+                  (insert "\n  (no items)"))))))
+      (save-excursion
+        ;; First block has no separator before it; treat the first non-blank,
+        ;; non-separator line at point-min as a header.
+        (goto-char (point-min))
+        (while (and (not (eobp)) (looking-at-p "^[ \t]*$"))
+          (forward-line 1))
+        (unless (or (eobp) (looking-at-p sep-re))
+          (funcall mark-empty))
+        ;; Subsequent blocks: each separator line precedes a header line.
+        (goto-char (point-min))
+        (while (re-search-forward sep-re nil t)
+          (forward-line 1)
+          (funcall mark-empty))))))
+
+(add-hook 'org-agenda-finalize-hook #'ao/agenda-mark-empty-blocks)
+
+;; Collapsible blocks in org-agenda via outline-minor-mode.
+;; Block headers are flush-left lines ending in "(...)" — e.g.
+;; "Upcoming (14 days)", "Reading list (top 5)". Items and date headers
+;; don't match, so only the dashboard-style block titles are fold points.
+(defun ao/agenda-setup-folding ()
+  "Enable outline-minor-mode in org-agenda for collapsible block sections."
+  (when (eq major-mode 'org-agenda-mode)
+    (setq-local outline-regexp "^[A-Z][^\n]*([^)]*)\\s-*$")
+    (setq-local outline-level (lambda () 1))
+    (outline-minor-mode 1)))
+
+(add-hook 'org-agenda-mode-hook #'ao/agenda-setup-folding)
+
+(defun ao/agenda-fold-or-goto ()
+  "On section headers: fold/unfold.  On items: visit the entry."
+  (interactive)
+  (if (and (bound-and-true-p outline-minor-mode)
+           (save-excursion (beginning-of-line) (looking-at-p outline-regexp)))
+      (outline-cycle)
+    (call-interactively #'org-agenda-goto)))
+
+(with-eval-after-load 'org-agenda
+  ;; TAB: smart — folds headers, visits items.
+  ;; S-TAB: cycle all sections at once.
+  (define-key org-agenda-mode-map (kbd "<tab>")     #'ao/agenda-fold-or-goto)
+  (define-key org-agenda-mode-map (kbd "<backtab>") #'outline-cycle-buffer))
 
 (provide 'org-config)
 ;;; org-config.el ends here

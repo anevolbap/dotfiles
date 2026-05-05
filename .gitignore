@@ -24,3 +24,4 @@ emacs/transient/
 # macOS metadata
 .DS_Store
 emacs/.DS_Store
+/env.local
