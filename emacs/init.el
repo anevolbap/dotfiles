@@ -48,6 +48,8 @@
 (load (concat user-emacs-directory "btc-price.el"))
 ;; Quick-view dashboard (world-clock, BTC, agenda) — bound to C-c s
 (load (concat user-emacs-directory "dashboard.el"))
+;; CV exporter — M-x cv-export-to-typst
+(load (concat user-emacs-directory "cv-export.el"))
 
 ;; Load my settings (settings.el is tangled from settings.org on save)
 (load (concat user-emacs-directory "settings.el"))
