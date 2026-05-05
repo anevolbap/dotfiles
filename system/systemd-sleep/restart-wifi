@@ -1,0 +1,31 @@
+#!/bin/sh
+# restart-wifi — reload the ath11k_pci WiFi driver after hibernate.
+#
+# On this laptop the Qualcomm ath11k WiFi often comes back broken after
+# resuming from hibernate (or suspend-then-hibernate). Reloading the kernel
+# module fixes it.
+#
+# Install by symlinking this file into systemd's sleep-hook directory:
+#
+#     sudo ln -sf "$(pwd)/system/systemd-sleep/restart-wifi" \
+#         /lib/systemd/system-sleep/restart-wifi
+#
+# systemd auto-discovers and runs every executable under
+# /lib/systemd/system-sleep/ around suspend/hibernate transitions — there is
+# no `systemctl enable` step.
+#
+# systemd invokes the hook with two args:
+#   $1 = "pre" | "post"
+#   $2 = "suspend" | "hibernate" | "hybrid-sleep" | "suspend-then-hibernate"
+
+set -eu
+
+case "$1/$2" in
+    post/hibernate|post/suspend-then-hibernate)
+        logger -t restart-wifi "resume from $2: reloading ath11k_pci"
+        /sbin/modprobe -r ath11k_pci
+        sleep 1
+        /sbin/modprobe ath11k_pci
+        logger -t restart-wifi "ath11k_pci reload complete"
+        ;;
+esac

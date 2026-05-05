@@ -4,7 +4,7 @@ DOTFILES_DIR := $(shell pwd)
 EMACS_TARGET  := $(HOME)/.emacs.d
 CRKBD_TARGET  := $(HOME)/qmk_firmware/keyboards/crkbd/keymaps/anevolbap
 
-.PHONY: emacs check delete crkbd local claude help
+.PHONY: emacs check delete crkbd local claude system help
 
 # Default target: show available targets
 help:
@@ -15,6 +15,7 @@ help:
 	@echo "  crkbd   — install Corne keyboard layout symlink"
 	@echo "  local   — install ~/.local/bin scripts (corne-rgb-alert)"
 	@echo "  claude  — install Claude Code settings (~/.claude/settings.json)"
+	@echo "  system  — install systemd-sleep hooks (requires sudo)"
 
 # Install / re-create symlinks for Emacs config
 emacs:
@@ -40,3 +41,8 @@ local:
 # Claude Code global settings (~/.claude/settings.json)
 claude:
 	stow --verbose --dir=$(DOTFILES_DIR) --target=$(HOME) --restow claude
+
+# systemd-sleep hooks (system path needs sudo; stow doesn't fit here)
+system:
+	sudo ln -sf $(DOTFILES_DIR)/system/systemd-sleep/restart-wifi \
+		/lib/systemd/system-sleep/restart-wifi
