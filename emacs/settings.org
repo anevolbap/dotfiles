@@ -300,6 +300,14 @@ Review periodically; remove or replace when MELPA alternatives appear.
 #+RESULTS:
 : %a, %d %b %I:%M %p %Z
 
+** Dashboard
+Centered child frame with world-clock, BTC price, and this week's agenda.
+Implementation lives in =dashboard.el=; loaded from =init.el=.
+Press =C-c s= to open, =q= / =ESC= to dismiss, =g= to refresh in place.
+#+begin_src emacs-lisp
+  (global-set-key (kbd "C-c s") #'dashboard-show)
+#+end_src
+
 ** Dired
 #+begin_src emacs-lisp
   (use-package dired

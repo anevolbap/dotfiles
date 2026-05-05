@@ -46,6 +46,8 @@
 (load (concat user-emacs-directory "completion-config.el"))
 ;; BTC price modeline widget — enable with M-x btc-price-mode
 (load (concat user-emacs-directory "btc-price.el"))
+;; Quick-view dashboard (world-clock, BTC, agenda) — bound to C-c s
+(load (concat user-emacs-directory "dashboard.el"))
 
 ;; Load my settings (settings.el is tangled from settings.org on save)
 (load (concat user-emacs-directory "settings.el"))

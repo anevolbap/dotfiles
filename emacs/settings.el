@@ -212,6 +212,8 @@
       '(("Etc/UTC"                          "UTC")))
 (setq world-clock-time-format "%a, %d %b %I:%M %p %Z")
 
+(global-set-key (kbd "C-c s") #'dashboard-show)
+
 (use-package dired
   :ensure nil
   :hook (dired-mode . dired-hide-details-mode)
