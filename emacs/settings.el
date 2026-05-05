@@ -797,7 +797,13 @@ where `syntax-ppss' does not reliably identify node types."
 
 (setq tramp-default-method "ssh")
 
-;; docker pull zevlg/telega-server:latest
+;; Telega requires telega-server via Docker (zevlg/telega-server).
+;; Pull pre-built image:
+;;   docker pull zevlg/telega-server:latest
+;; Or rebuild locally from the Dockerfile in the telega repo:
+;;   cd ~/.emacs.d/elpaca/sources/telega
+;;   docker build -f etc/Dockerfile -t zevlg/telega-server:latest .
+;; Session data lives in ~/.telega/ (td.binlog holds auth state).
 (use-package telega
   :init (setq telega-use-docker t))
 
