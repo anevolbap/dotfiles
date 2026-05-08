@@ -18,6 +18,15 @@
 (setq-default cursor-type 'box)
 
 ;; ============================================================================
+;; Tooltips
+;; Show tooltip text in the echo area instead of a separate frame. The
+;; tooltip frame on this Emacs+GTK3 build triggers a GdkX11Window->GtkWindow
+;; cast warning whenever it is resized.
+;; ============================================================================
+
+(setq tooltip-use-echo-area t)
+
+;; ============================================================================
 ;; Fringe and window divider pixel faces
 ;; ============================================================================
 

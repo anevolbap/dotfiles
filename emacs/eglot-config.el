@@ -138,28 +138,39 @@
   (breadcrumb-mode 1))
 
 ;; ============================================================================
-;; Corfu — in-buffer completion popup (works with eglot capf)
+;; DEPRECATED: Corfu + corfu-terminal in-GUI workaround
+;;   Disabled while testing whether the built-in *Completions* popup is silent
+;;   on this build now that tooltips are routed to the echo area. If TAB
+;;   completion in any buffer prints a GTK cast warning, re-enable both blocks.
 ;; ============================================================================
 
-(use-package corfu
-  :ensure t
-  :demand t  ; global-corfu-mode must run at startup, not on first trigger
-  :init
-  (global-corfu-mode)
-  :custom
-  (corfu-auto t)
-  (corfu-auto-delay 0.2)
-  (corfu-auto-prefix 2)
-  (corfu-cycle t)
-  (corfu-preselect 'prompt)
-  (corfu-quit-no-match 'separator))
+;; (use-package corfu
+;;   :ensure t
+;;   :demand t  ; global-corfu-mode must run at startup, not on first trigger
+;;   :init
+;;   (global-corfu-mode)
+;;   :custom
+;;   (corfu-auto t)
+;;   (corfu-auto-delay 0.2)
+;;   (corfu-auto-prefix 2)
+;;   (corfu-cycle t)
+;;   (corfu-preselect 'prompt)
+;;   (corfu-quit-no-match 'separator))
 
-;; corfu uses child frames in GUI; in terminal use overlay-based popup instead
-(use-package corfu-terminal
-  :ensure t
-  :unless (display-graphic-p)
-  :config
-  (corfu-terminal-mode +1))
+;; ;; Force overlay-based popups in both GUI and terminal. corfu's default
+;; ;; child-frame popup hits a GTK3 cast assertion on this build; the popon
+;; ;; overlay path used by corfu-terminal sidesteps it entirely.
+;; (use-package corfu-terminal
+;;   :ensure t
+;;   :demand t
+;;   :init (add-to-list 'warning-suppress-types '(corfu))
+;;   :custom (corfu-terminal-disable-on-gui nil)
+;;   :config (corfu-terminal-mode +1))
+
+;; ============================================================================
+;; Cape — extra completion-at-point backends (file paths, dabbrev)
+;; Works with whatever completion UI is active.
+;; ============================================================================
 
 (use-package cape
   :ensure t
