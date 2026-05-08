@@ -101,10 +101,6 @@
    ;; Project buffers
    ("C-x p b" . consult-project-buffer))
 
-  :hook
-  ;; Enable previews in completion buffers
-  (completion-list-mode . consult-preview-at-point-mode)
-
   :config
   ;; Better register preview
   (setq register-preview-delay 0.3
@@ -125,9 +121,7 @@
 ;; 7. Integration (Embark + Consult)
 ;; ------------------------------------------------------------
 (use-package embark-consult
-  :after (embark consult)
-  :hook
-  (embark-collect-mode . consult-preview-at-point-mode))
+  :after (embark consult))
 
 ;; Richer annotations in the *Completions* buffer
 (setq completions-detailed t)
