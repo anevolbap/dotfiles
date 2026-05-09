@@ -25,3 +25,7 @@ emacs/transient/
 .DS_Store
 emacs/.DS_Store
 /env.local
+
+# Claude Code project notes and per-machine settings
+/CLAUDE.md
+claude/.claude/settings.json
