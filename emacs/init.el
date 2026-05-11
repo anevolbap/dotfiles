@@ -29,9 +29,13 @@
                      gcs-done)))
 
 ;; Additional exec-path entries for tools not on the system PATH.
-;; expand-file-name resolves ~ so the strings are usable as directory paths.
-(add-to-list 'exec-path (expand-file-name "~/.local/bin"))
-(add-to-list 'exec-path (expand-file-name "~/.pyenv/bin"))
+;; Also keep $PATH in sync so subprocesses (vterm, eshell, sh -c ...) see them.
+;; Needed for daemon mode, where $PATH is not inherited from a login shell.
+(dolist (dir '("~/.local/bin" "~/.pyenv/bin"))
+  (let ((d (expand-file-name dir)))
+    (add-to-list 'exec-path d)
+    (unless (member d (split-string (or (getenv "PATH") "") ":"))
+      (setenv "PATH" (concat d ":" (getenv "PATH"))))))
 
 ;; Load custom file
 (setq-default custom-file (concat user-emacs-directory "custom.el"))
