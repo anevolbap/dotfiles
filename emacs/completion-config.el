@@ -1,8 +1,8 @@
 ;;; completion-config.el --- Completion configuration for Emacs  -*- lexical-binding: t -*-
 
 ;;; Commentary:
-;; Minimal, efficient completion setup using Vertico + Orderless + Consult
-;; No frills - just fast, predictable completion.
+;; Minimal, efficient completion setup using built-in icomplete-vertical
+;; + Orderless + Consult. No frills - just fast, predictable completion.
 
 ;;; Code:
 
@@ -24,22 +24,8 @@
   (global-set-key (kbd "M-TAB") 'completion-at-point))
 
 ;; ------------------------------------------------------------
-;; 2. DEPRECATED: Vertico (replaced by built-in icomplete-vertical)
-;;    Remove this block if icomplete-vertical proves sufficient.
+;; 2. Minibuffer UI (built-in icomplete-vertical)
 ;; ------------------------------------------------------------
-;; (use-package vertico
-;;   :demand t  ; always-on minibuffer UI, must load at startup
-;;   :init
-;;   (vertico-mode)
-;;   :config
-;;   ;; Show 10 candidates by default
-;;   (setq vertico-count 10)
-;;   ;; Resize minibuffer to fit content
-;;   (setq vertico-resize t)
-;;   ;; Allow cycling through candidates
-;;   (setq vertico-cycle t))
-
-;; Built-in alternative to vertico
 (icomplete-vertical-mode 1)
 (setq icomplete-show-matches-on-no-input t
       icomplete-prospects-height 5)
@@ -47,8 +33,24 @@
 ;; Truncate long candidates instead of wrapping
 (add-hook 'icomplete-minibuffer-setup-hook
           (lambda () (setq-local truncate-lines t)))
-;; RET accepts the selected candidate, not the literal input
-(define-key icomplete-minibuffer-map (kbd "RET") #'icomplete-force-complete-and-exit)
+;; RET accepts the selected candidate, like vertico. Exception: in a
+;; file prompt, when the input is a directory path and the selection
+;; has not been moved, take the input literally so RET in C-x d opens
+;; the prompted directory instead of the first match inside it (what
+;; vertico-preselect 'directory does).
+(defun ao/icomplete-ret ()
+  "Exit with the selected candidate, or with a literal directory input."
+  (interactive)
+  (if (and minibuffer-completing-file-name
+           (string-suffix-p "/" (minibuffer-contents))
+           (not icomplete--scrolled-completions))
+      (exit-minibuffer)
+    (icomplete-force-complete-and-exit)))
+(define-key icomplete-minibuffer-map (kbd "RET") #'ao/icomplete-ret)
+;; M-RET exits with the literal input (vertico's M-RET).
+(define-key icomplete-minibuffer-map (kbd "M-RET") #'icomplete-fido-exit)
+;; TAB inserts the selected candidate without exiting (vertico's TAB).
+(define-key icomplete-minibuffer-map (kbd "TAB") #'icomplete-force-complete)
 
 ;; ------------------------------------------------------------
 ;; 3. Flexible Matching (Orderless)
@@ -61,18 +63,7 @@
         '((file (styles partial-completion basic)))))
 
 ;; ------------------------------------------------------------
-;; 4. DEPRECATED: Marginalia (replaced by built-in completions-detailed)
-;;    Remove this block if completions-detailed proves sufficient.
-;; ------------------------------------------------------------
-(use-package marginalia
-  :demand t  ; always-on annotation layer, must load at startup
-  :init
-  ;; (marginalia-mode)  ; disabled — completions-detailed covers this
-  :bind (:map minibuffer-local-map
-		 ("M-A" . marginalia-cycle)))
-
-;; ------------------------------------------------------------
-;; 5. Action System (Embark)
+;; 4. Action System (Embark)
 ;; ------------------------------------------------------------
 (use-package embark
   :bind
@@ -84,7 +75,7 @@
   (setq prefix-help-command #'embark-prefix-help-command))
 
 ;; ------------------------------------------------------------
-;; 6. Enhanced Search & Navigation (Consult)
+;; 5. Enhanced Search & Navigation (Consult)
 ;; ------------------------------------------------------------
 (use-package consult
   :bind
@@ -104,11 +95,11 @@
   :config
   ;; Better register preview
   (setq register-preview-delay 0.3
-		register-preview-function #'consult-register-format)
+        register-preview-function #'consult-register-format)
 
   ;; Use Consult for xref
   (setq xref-show-xrefs-function #'consult-xref
-		xref-show-definitions-function #'consult-xref)
+        xref-show-definitions-function #'consult-xref)
 
   ;; Preview configuration
   (consult-customize
@@ -118,7 +109,7 @@
    :preview-key '(:debounce 0.4 any)))
 
 ;; ------------------------------------------------------------
-;; 7. Integration (Embark + Consult)
+;; 6. Integration (Embark + Consult)
 ;; ------------------------------------------------------------
 (use-package embark-consult
   :after (embark consult))
