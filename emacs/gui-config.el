@@ -55,16 +55,20 @@
 ;; https://github.com/be5invis/Iosevka
 ;; ============================================================================
 
+;; Default frame font: applies to chrome and buffers without a buffer-face
+;; hook (minibuffer, dired, magit, mode-line, completion UI).
+(set-face-attribute 'default nil :family "Iosevka" :height 140 :weight 'light)
+
 (defun ao/buffer-face-mode-variable ()
   "Set font to a variable width (proportional) font in current buffer."
   (interactive)
-  (setq buffer-face-mode-face '(:family "Iosevka" :height 140 :width semi-condensed))
+  (setq buffer-face-mode-face '(:family "Iosevka" :height 140 :width semi-condensed :weight light))
   (buffer-face-mode))
 
 (defun ao/buffer-face-mode-fixed ()
   "Set font to a fixed width (monospace) font in current buffer."
   (interactive)
-  (setq buffer-face-mode-face '(:family "Iosevka" :height 140))
+  (setq buffer-face-mode-face '(:family "Iosevka" :height 140 :weight light))
   (buffer-face-mode))
 
 (add-hook 'prog-mode-hook 'ao/buffer-face-mode-fixed)
