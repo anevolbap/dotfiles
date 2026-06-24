@@ -610,8 +610,21 @@ that checks the node type at point.
   ;; Relative line numbers in prog-mode (useful with evil/avy jumps).
   ;; Disabled in text/org modes where line numbers add visual clutter.
   (defun ao/enable-relative-line-numbers ()
-    (display-line-numbers-mode t)
-    (setq-local display-line-numbers 'relative))
+    ;; Skip *scratch* (a prog-mode buffer) so it stays clean: no numbers, no rule.
+    (unless (string= (buffer-name) "*scratch*")
+      (display-line-numbers-mode t)
+      (setq-local display-line-numbers 'relative)
+      ;; Continuous thin rule between the line-number gutter and the code, in the
+      ;; theme's own border colour (`vertical-border').  A background-coloured 1px
+      ;; stretch (not a character) so it spans the `line-spacing' gaps and reads as
+      ;; one unbroken line.  Spaces pad each side.
+      (let* ((color (face-attribute 'vertical-border :foreground nil t))
+             (sep (concat " "
+                          (propertize " " 'face (list :background color)
+                                      'display '(space :width (1)))
+                          " ")))
+        (setq-local line-prefix sep)
+        (setq-local wrap-prefix sep))))
 
   (defun ao/disable-line-numbers ()
     (display-line-numbers-mode -1))
