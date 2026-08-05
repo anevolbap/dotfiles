@@ -17,6 +17,11 @@
 ;; Set early so it is in effect during package loading, not just after.
 (setq read-process-output-max (* 1024 1024)) ; 1 MB — improves LSP throughput
 
+;; *scratch* defaults to `lisp-interaction-mode', which derives from `prog-mode',
+;; so every `prog-mode-hook' entry (highlight-indent-guides, hideshow, hl-line,
+;; line numbers, buffer fonts) loads during startup.
+(setq initial-major-mode 'fundamental-mode)
+
 ;; Local Variables:
 ;; no-byte-compile: t
 ;; no-native-compile: t
