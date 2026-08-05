@@ -579,12 +579,14 @@ where `syntax-ppss' does not reliably identify node types."
   :hook
   ;; Save breakpoints on quit
   (kill-emacs . dape-breakpoint-save)
-  ;; Load breakpoints on startup
-  (after-init . dape-breakpoint-load)
+  ;; DEPRECATED: loading breakpoints on startup pulled dape (and tramp, gdb-mi)
+  ;; into every session. Run M-x dape-breakpoint-load by hand instead.
+  ;; (after-init . dape-breakpoint-load)
 
   :custom
-  ;; Turn on global bindings for setting breakpoints with mouse
-  (dape-breakpoint-global-mode t)
+  ;; DEPRECATED: `:custom' on a global minor mode calls the mode function, which
+  ;; loads dape at startup. Moved to `:config' below so it turns on with dape.
+  ;; (dape-breakpoint-global-mode t)
 
   ;; Info buffers to the right
   (dape-buffer-window-arrangement 'right)
@@ -593,6 +595,9 @@ where `syntax-ppss' does not reliably identify node types."
   (dape-inline-variables t)
 
   :config
+  ;; Global bindings for setting breakpoints with mouse
+  (dape-breakpoint-global-mode 1)
+
   ;; Pulse source line (slight performance hit)
   (add-hook 'dape-display-source-hook #'pulse-momentary-highlight-one-line)
 
