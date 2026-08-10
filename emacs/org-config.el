@@ -150,13 +150,16 @@
   (add-to-list 'org-modules 'org-habit t)
   (add-to-list 'org-modules 'org-protocol t) ; browser capture via org-protocol://
 
-  ;; org-habit: keep the graph narrow.
-  ;; `org-habit-show-habits-only-for-today' nil puts a habit on every agenda day
-  ;; it is due, not just today. `org-habit-show-all-today' keeps it on today's
-  ;; line even after it is marked DONE, when the `.+1d' repeater has already
-  ;; pushed SCHEDULED to tomorrow.
-  (setq org-habit-show-habits-only-for-today nil
-        org-habit-show-all-today t
+  ;; org-habit: show habits only on today's agenda line; keep graph narrow.
+  ;; Undone habits show with the `!' glyph and leave the agenda once marked DONE,
+  ;; so an empty day agenda means done for the day. In the agenda, `K' toggles
+  ;; habits off/on and `C-u K' shows the graphs of habits already done today.
+  ;;
+  ;; A missed habit keeps its old SCHEDULED date, so it would be dropped by the
+  ;; `org-scheduled-past-days' 0 in the "A" day block. Habits use this value
+  ;; instead, so an overdue habit stays on today's agenda until it is done.
+  (setq org-habit-show-habits-only-for-today t
+        org-habit-scheduled-past-days 10000
         org-habit-graph-column 50
         org-habit-preceding-days 14
         org-habit-following-days 7)
