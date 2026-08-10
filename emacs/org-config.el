@@ -102,8 +102,20 @@
        (tags-todo "-read"
                   ((org-agenda-overriding-header "Active TODOs (top 5 by latest update)")
                    (org-agenda-sorting-strategy '(tsia-down))
+                   (org-agenda-skip-function
+                    '(org-agenda-skip-entry-if 'regexp "^[ \t]*:STYLE:[ \t]+habit"))
                    (org-agenda-max-entries 5)))))
      ("l" "Reading list" tags-todo "read")
+     ;; Habits (STYLE: habit in habits.org). Only today's line is shown, with
+     ;; the consistency graph; `org-habit-graph-column' sets where it starts.
+     ("h" "Habits"
+      ((agenda "" ((org-agenda-span 1)
+                   (org-agenda-entry-types '(:scheduled))
+                   (org-agenda-time-grid nil)
+                   (org-agenda-format-date "%A %-e %B %Y")
+                   (org-agenda-skip-function
+                    '(org-agenda-skip-entry-if 'notregexp "^[ \t]*:STYLE:[ \t]+habit"))
+                   (org-agenda-overriding-header "\nHabits\n")))))
      ("u" "Upcoming (next 14 days)"
       ((agenda "" ((org-agenda-span 14)
                    (org-agenda-start-on-weekday nil)
@@ -114,7 +126,9 @@
                    (org-agenda-overriding-header "\nUpcoming (+14d)\n")))))
      ("t" "All active TODOs"
       ((todo "TODO|IN-PROGRESS|WAITING"
-             ((org-agenda-overriding-header "\nActive TODOs\n")))))
+             ((org-agenda-overriding-header "\nActive TODOs\n")
+              (org-agenda-skip-function
+               '(org-agenda-skip-entry-if 'regexp "^[ \t]*:STYLE:[ \t]+habit"))))))
      ("A" "Daily agenda and top priority tasks"
       ((agenda "" ((org-agenda-span 1)
                    (org-deadline-warning-days 0)
