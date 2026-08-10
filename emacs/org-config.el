@@ -150,8 +150,12 @@
   (add-to-list 'org-modules 'org-habit t)
   (add-to-list 'org-modules 'org-protocol t) ; browser capture via org-protocol://
 
-  ;; org-habit: show graph only for today; keep graph narrow
+  ;; org-habit: show graph only for today; keep graph narrow.
+  ;; `org-habit-show-all-today' keeps a habit on today's agenda line even after
+  ;; it is marked DONE, when the `.+1d' repeater has already pushed SCHEDULED to
+  ;; tomorrow. Without it, a habit vanishes from the agenda as soon as it is done.
   (setq org-habit-show-habits-only-for-today t
+        org-habit-show-all-today t
         org-habit-graph-column 50
         org-habit-preceding-days 14
         org-habit-following-days 7)
