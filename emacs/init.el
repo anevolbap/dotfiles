@@ -63,10 +63,24 @@
 (load (concat user-emacs-directory "completion-config.el"))
 ;; BTC price modeline widget — enable with M-x btc-price-mode
 (load (concat user-emacs-directory "btc-price.el"))
-;; Quick-view dashboard (world-clock, BTC, agenda) — bound to C-c s
-(load (concat user-emacs-directory "dashboard.el"))
-;; CV exporter — M-x cv-export-to-typst
-(load (concat user-emacs-directory "cv-export.el"))
+;; Quick-view dashboard (world-clock, BTC, agenda) — bound to C-c s.
+;; Autoloaded so its (require 'org-agenda) doesn't pull org into startup.
+(autoload 'dashboard-show (concat user-emacs-directory "dashboard.el") nil t)
+;; CV exporter — M-x cv-export-to-typst.
+;; Autoloaded so its (require 'org) doesn't pull org into startup.
+(autoload 'cv-export-to-typst (concat user-emacs-directory "cv-export.el") nil t)
+;; Claude Code sessions across all projects — M-x claude-sessions.
+;; Autoloaded so its (require 'acp) doesn't pull agent-shell into startup.
+(autoload 'claude-sessions (concat user-emacs-directory "claude-sessions.el") nil t)
+;; Sessions as flat Org data for the agenda — M-x claude-sessions-org-sync,
+;; then C-c a S or M-x ao/sessions-for-project.
+(autoload 'claude-sessions-org-sync (concat user-emacs-directory "claude-sessions-org.el") nil t)
+(autoload 'claude-sessions-org-follow (concat user-emacs-directory "claude-sessions-org.el"))
+(autoload 'claude-sessions-resume-at-point (concat user-emacs-directory "claude-sessions-org.el") nil t)
+;; Register the link type eagerly: following a link must work on a freshly
+;; opened projects.org, before anything has loaded claude-sessions-org.el.
+(with-eval-after-load 'ol
+  (org-link-set-parameters "claude-session" :follow #'claude-sessions-org-follow))
 
 ;; Load my settings (settings.el is tangled from settings.org on save)
 (load (concat user-emacs-directory "settings.el"))
