@@ -31,11 +31,24 @@
 ;; Additional exec-path entries for tools not on the system PATH.
 ;; Also keep $PATH in sync so subprocesses (vterm, eshell, sh -c ...) see them.
 ;; Needed for daemon mode, where $PATH is not inherited from a login shell.
-(dolist (dir '("~/.local/bin" "~/.pyenv/bin"))
-  (let ((d (expand-file-name dir)))
-    (add-to-list 'exec-path d)
-    (unless (member d (split-string (or (getenv "PATH") "") ":"))
-      (setenv "PATH" (concat d ":" (getenv "PATH"))))))
+;; nvm is only sourced from .bashrc, so node and its global npm binaries
+;; (claude-agent-acp) are invisible to daemon Emacs. Resolve the bin dir of the
+;; version named in ~/.nvm/alias/default instead of hardcoding it.
+(let* ((alias (expand-file-name "~/.nvm/alias/default"))
+       (version (and (file-readable-p alias)
+                     (string-trim (with-temp-buffer
+                                    (insert-file-contents alias)
+                                    (buffer-string)))))
+       (nvm-bin (and version
+                     (car (last (file-expand-wildcards
+                                 (expand-file-name
+                                  (format "~/.nvm/versions/node/v%s*/bin"
+                                          version))))))))
+  (dolist (dir (delq nil (list "~/.local/bin" "~/.pyenv/bin" nvm-bin)))
+    (let ((d (expand-file-name dir)))
+      (add-to-list 'exec-path d)
+      (unless (member d (split-string (or (getenv "PATH") "") ":"))
+        (setenv "PATH" (concat d ":" (getenv "PATH")))))))
 
 ;; Load custom file
 (setq-default custom-file (concat user-emacs-directory "custom.el"))
@@ -50,10 +63,24 @@
 (load (concat user-emacs-directory "completion-config.el"))
 ;; BTC price modeline widget — enable with M-x btc-price-mode
 (load (concat user-emacs-directory "btc-price.el"))
-;; Quick-view dashboard (world-clock, BTC, agenda) — bound to C-c s
-(load (concat user-emacs-directory "dashboard.el"))
-;; CV exporter — M-x cv-export-to-typst
-(load (concat user-emacs-directory "cv-export.el"))
+;; Quick-view dashboard (world-clock, BTC, agenda) — bound to C-c s.
+;; Autoloaded so its (require 'org-agenda) doesn't pull org into startup.
+(autoload 'dashboard-show (concat user-emacs-directory "dashboard.el") nil t)
+;; CV exporter — M-x cv-export-to-typst.
+;; Autoloaded so its (require 'org) doesn't pull org into startup.
+(autoload 'cv-export-to-typst (concat user-emacs-directory "cv-export.el") nil t)
+;; Claude Code sessions across all projects — M-x claude-sessions.
+;; Autoloaded so its (require 'acp) doesn't pull agent-shell into startup.
+(autoload 'claude-sessions (concat user-emacs-directory "claude-sessions.el") nil t)
+;; Sessions as flat Org data for the agenda — M-x claude-sessions-org-sync,
+;; then C-c a S or M-x ao/sessions-for-project.
+(autoload 'claude-sessions-org-sync (concat user-emacs-directory "claude-sessions-org.el") nil t)
+(autoload 'claude-sessions-org-follow (concat user-emacs-directory "claude-sessions-org.el"))
+(autoload 'claude-sessions-resume-at-point (concat user-emacs-directory "claude-sessions-org.el") nil t)
+;; Register the link type eagerly: following a link must work on a freshly
+;; opened projects.org, before anything has loaded claude-sessions-org.el.
+(with-eval-after-load 'ol
+  (org-link-set-parameters "claude-session" :follow #'claude-sessions-org-follow))
 
 ;; Load my settings (settings.el is tangled from settings.org on save)
 (load (concat user-emacs-directory "settings.el"))
@@ -95,26 +122,25 @@
 (unless (display-graphic-p)
   (setenv "GPG_TTY" (string-trim (shell-command-to-string "tty"))))
 
-;; Env variables
-(use-package exec-path-from-shell
-  :demand t
-  :config
-  ;; Specify the environment variables ECA needs
-  (setq exec-path-from-shell-variables
-        '("ANTHROPIC_API_KEY"
-          "OPENAI_API_KEY"
-          "OLLAMA_API_BASE"
-          "OPENAI_API_URL"
-          "ANTHROPIC_API_URL"
-          "ECA_CONFIG"
-          "XDG_CONFIG_HOME"
-          "PATH"
-          "MANPATH"))
-  (setq exec-path-from-shell-debug nil)
-  (dolist (var '("SHELL" "SSH_AUTH_SOCK" "SSH_AGENT_PID" "PATH" "HOME" "LSP_USE_PLISTS"))
-    (add-to-list 'exec-path-from-shell-variables var))
-    ;; Only needed on macOS where GUI Emacs doesn't inherit shell env
-  (when (memq window-system '(mac ns))
+;; Env variables — only needed on macOS where GUI Emacs doesn't inherit shell
+;; env. On Linux $PATH is already set up above, so skip loading the package.
+(when (memq window-system '(mac ns))
+  (use-package exec-path-from-shell
+    :demand t
+    :config
+    ;; Specify the environment variables ECA needs
+    (setq exec-path-from-shell-variables
+          '("ANTHROPIC_API_KEY"
+            "OPENAI_API_KEY"
+            "OPENAI_API_URL"
+            "ANTHROPIC_API_URL"
+            "ECA_CONFIG"
+            "XDG_CONFIG_HOME"
+            "PATH"
+            "MANPATH"))
+    (setq exec-path-from-shell-debug nil)
+    (dolist (var '("SHELL" "SSH_AUTH_SOCK" "SSH_AGENT_PID" "PATH" "HOME" "LSP_USE_PLISTS"))
+      (add-to-list 'exec-path-from-shell-variables var))
     (exec-path-from-shell-initialize)))
 
 

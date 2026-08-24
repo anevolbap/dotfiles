@@ -47,6 +47,11 @@
   (org-todo-keywords
    '((sequence "TODO(t)" "IN-PROGRESS(i)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)")))
 
+  ;; Per-keyword colors. Inherit theme faces instead of hardcoding hex, so the
+  ;; palette follows the theme (light/dark).
+  (org-todo-keyword-faces
+   '(("EXPIRED"   . (:inherit shadow))))                ; dead/neutral
+
   ;; Refile across all agenda files, up to 3 levels deep
   (org-refile-targets '((org-agenda-files :maxlevel . 3)))
   (org-refile-use-outline-path 'file)
@@ -194,6 +199,154 @@
         (let ((inhibit-read-only t))
           (goto-char (point-max))
           (insert "  (no items)\n"))))))
+
+;; ============================================================================
+;; Link triage — the "t" capture template fills :URL: from the clipboard
+;; automatically when it looks like a link, untagged. Running
+;; `ao/org-triage-links' (by hand, or via the timer below) classifies each
+;; untagged link TODO in tasks.org by regex on its URL: arxiv -> paper
+;; (title/author/venue/year fetched from the arXiv API, filed into
+;; papers.org), youtube/vimeo -> video, anything else -> read. Video and read
+;; entries are just tagged in place.
+;; ============================================================================
+
+(require 'xml)
+
+(defun ao/clipboard-url-or-nil ()
+  "Return the current kill if it looks like a URL, else nil.
+Used by the \"t\" capture template so a plain task capture does not pick up
+unrelated clipboard text as a bogus :URL: property."
+  (let ((s (ignore-errors (current-kill 0 t))))
+    (and s (string-match-p "\\`https?://" s) s)))
+
+(defun ao/arxiv-id-from-url (url)
+  "Return the arxiv id in URL, or nil if URL is not an arxiv link."
+  (when (and url (string-match "arxiv\\.org/\\(?:abs\\|pdf\\)/\\([0-9]+\\.[0-9]+\\)" url))
+    (match-string 1 url)))
+
+(defun ao/arxiv-fetch-metadata (id)
+  "Fetch title, authors and year for arxiv ID from the arXiv API."
+  (let ((buf (url-retrieve-synchronously
+              (format "https://export.arxiv.org/api/query?id_list=%s" id)
+              t t 15)))
+    (unless buf
+      (error "No response fetching arxiv metadata for %s" id))
+    (unwind-protect
+        (with-current-buffer buf
+          (goto-char (point-min))
+          (re-search-forward "\n\n")
+          (let* ((feed (car (xml-parse-region (point) (point-max))))
+                 (entry (car (xml-get-children feed 'entry))))
+            (unless entry
+              (error "No entry in arxiv response for %s" id))
+            (list
+             :title (xml-substitute-special
+                     (string-trim (car (xml-node-children (car (xml-get-children entry 'title))))))
+             :authors (mapconcat
+                       (lambda (author)
+                         (car (xml-node-children (car (xml-get-children author 'name)))))
+                       (xml-get-children entry 'author)
+                       ", ")
+             :year (let ((published (car (xml-node-children (car (xml-get-children entry 'published))))))
+                     (and published (substring published 0 4))))))
+      (kill-buffer buf))))
+
+(defun ao/org-file-under (file heading)
+  "Return a marker at HEADING (top level) in FILE, creating both if needed."
+  (with-current-buffer (find-file-noselect file)
+    (goto-char (point-min))
+    (unless (re-search-forward (format "^\\* %s$" (regexp-quote heading)) nil t)
+      (goto-char (point-max))
+      (unless (bolp) (insert "\n"))
+      (insert (format "* %s\n" heading)))
+    (point-marker)))
+
+(defun ao/org-take-subtree ()
+  "Delete the subtree at point and return its text.
+Deliberately avoids `org-cut-subtree': that cuts with `kill-region', which
+appends to the previous kill entry once `last-command' is `kill-region'.
+Called in a loop, the kill then accumulates every subtree cut so far and
+`org-paste-subtree' re-inserts the whole pile each time."
+  (org-back-to-heading t)
+  (let* ((beg (point))
+         (end (save-excursion (org-end-of-subtree t t) (point)))
+         (text (buffer-substring-no-properties beg end)))
+    (delete-region beg end)
+    text))
+
+(defun ao/org-triage-paper-entry (marker papers-file)
+  "Fill arxiv metadata for the paper entry at MARKER, then file it under PAPERS-FILE."
+  (let ((subtree
+         (with-current-buffer (marker-buffer marker)
+           (goto-char marker)
+           (let* ((url (org-entry-get nil "URL"))
+                  (id (ao/arxiv-id-from-url url)))
+             (unless id
+               (user-error "No arxiv id in URL: %s" url))
+             (let ((meta (ao/arxiv-fetch-metadata id)))
+               (org-edit-headline (plist-get meta :title))
+               (org-entry-put marker "AUTHOR" (plist-get meta :authors))
+               (org-entry-put marker "VENUE" "arXiv")
+               (org-entry-put marker "YEAR" (plist-get meta :year))
+               (org-entry-put marker "DOI" (format "https://arxiv.org/abs/%s" id))))
+           (goto-char marker)
+           (ao/org-take-subtree))))
+    (let ((target (ao/org-file-under papers-file "Papers")))
+      (with-current-buffer (marker-buffer target)
+        (goto-char target)
+        (end-of-line)
+        (newline)
+        ;; Pass the text explicitly; never read it back from the kill ring.
+        (org-paste-subtree 2 subtree)
+        (save-buffer)))))
+
+(defun ao/classify-link-url (url)
+  "Classify URL as `paper', `video' or `read' by pattern match."
+  (cond
+   ((string-match-p "arxiv\\.org/" url) 'paper)
+   ((string-match-p "\\(?:youtube\\.com\\|youtu\\.be\\|vimeo\\.com\\)/" url) 'video)
+   (t 'read)))
+
+(defun ao/org-triage-links ()
+  "Classify untagged link TODOs in tasks.org and tag or file them.
+Papers get arxiv metadata filled in and are moved into papers.org; video and
+read entries are just tagged in place. Logs rather than stops on an entry
+that fails."
+  (interactive)
+  (let* ((tasks-file (expand-file-name "tasks.org" my-org-directory))
+         (papers-file (expand-file-name "papers.org" my-org-directory))
+         (buf (find-file-noselect tasks-file))
+         (markers (with-current-buffer buf
+                    (delq nil
+                          (org-map-entries
+                           (lambda ()
+                             (when (and (equal (org-get-todo-state) "TODO")
+                                        (not (string= (or (org-entry-get nil "URL") "") ""))
+                                        (not (org-get-tags nil t)))
+                               (point-marker)))
+                           nil 'file))))
+         (done 0) (failed 0))
+    (dolist (marker markers)
+      (condition-case err
+          (progn
+            (with-current-buffer (marker-buffer marker)
+              (goto-char marker)
+              (let* ((url (org-entry-get nil "URL"))
+                     (type (ao/classify-link-url url)))
+                (org-set-tags (list (symbol-name type)))
+                (when (eq type 'paper)
+                  (ao/org-triage-paper-entry marker papers-file))))
+            (cl-incf done))
+        (error (cl-incf failed)
+               (message "ao/org-triage-links: failed at %s: %s"
+                        marker (error-message-string err)))))
+    (with-current-buffer buf (save-buffer))
+    (message "ao/org-triage-links: %d tagged, %d failed" done failed)))
+
+;; DEPRECATED: automatic timer, disabled after real-data testing turned up
+;; entries messier than the synthetic fixtures covered. Run `M-x
+;; ao/org-triage-links' by hand for now.
+;; (run-with-timer 60 (* 6 60 60) #'ao/org-triage-links)
 
 ;; ============================================================================
 ;; org-download — drag-and-drop / paste images into org files

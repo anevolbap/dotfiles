@@ -1,15 +1,23 @@
-#+TITLE: mi configuración
-#+AUTHOR: anevolbap
-#+DATE: <2024-06-11 Tue>
-#+LANGUAGE: en
-#+SEQ_TODO: TODO REVIEW FIX DONE
-#+PROPERTY: header-args:emacs-lisp :tangle yes :lexical t
+#+title: GNU Emacs configuration
+#+author: anevolbap
+#+date: <2026-08-11 Tue>
+#+language: en
+#+seq_todo: TODO REVIEW FIX DONE
+#+property: header-args:emacs-lisp :tangle yes :lexical t
 
 #+begin_src emacs-lisp :comments no
-;;; -*- lexical-binding: t -*-
+  ;;; -*- lexical-binding: t -*-
 #+end_src
 
 * TODO to be reviewed
+#+BEGIN_SRC emacs-lisp
+  (use-package speedbar
+    :ensure nil
+    :commands (speedbar)
+    :config
+    (setq speedbar-prefer-window t)
+    (setq speedbar-use-images nil))
+#+END_SRC
 
 Add outline-mode config with kirigami!
 #+BEGIN_SRC emacs-lisp
@@ -140,17 +148,33 @@ Add outline-mode config with kirigami!
 
 ** Folding
 #+begin_src emacs-lisp
-  (use-package kirigami
-    :ensure t
+  ;; DEPRECATED: kirigami replaced by built-in hideshow. Remove once confirmed.
+  ;; (use-package kirigami
+  ;;   :ensure t
+  ;;   :config
+  ;;   (define-prefix-command 'kirigami-command-map)
+  ;;   (global-set-key (kbd "C-c f") 'kirigami-command-map)
+  ;;   (define-key kirigami-command-map (kbd "o")   'kirigami-open-fold)
+  ;;   (define-key kirigami-command-map (kbd "O")   'kirigami-open-fold-rec)
+  ;;   (define-key kirigami-command-map (kbd "c")   'kirigami-close-fold)
+  ;;   (define-key kirigami-command-map (kbd "m")   'kirigami-close-folds)
+  ;;   (define-key kirigami-command-map (kbd "r")   'kirigami-open-folds)
+  ;;   (define-key kirigami-command-map (kbd "TAB") 'kirigami-toggle-fold))
+
+  (use-package hideshow
+    :ensure nil
+    :hook (prog-mode . hs-minor-mode)
     :config
-    (define-prefix-command 'kirigami-command-map)
-    (global-set-key (kbd "C-c f") 'kirigami-command-map)
-    (define-key kirigami-command-map (kbd "o")   'kirigami-open-fold)
-    (define-key kirigami-command-map (kbd "O")   'kirigami-open-fold-rec)
-    (define-key kirigami-command-map (kbd "c")   'kirigami-close-fold)
-    (define-key kirigami-command-map (kbd "m")   'kirigami-close-folds)
-    (define-key kirigami-command-map (kbd "r")   'kirigami-open-folds)
-    (define-key kirigami-command-map (kbd "TAB") 'kirigami-toggle-fold))
+    (define-prefix-command 'hs-command-map)
+    (global-set-key (kbd "C-c f") 'hs-command-map)
+    (define-key hs-command-map (kbd "o")   'hs-show-block)
+    (define-key hs-command-map (kbd "c")   'hs-hide-block)
+    (define-key hs-command-map (kbd "m")   'hs-hide-all)
+    (define-key hs-command-map (kbd "r")   'hs-show-all)
+    (define-key hs-command-map (kbd "l")   'hs-hide-level)
+    (define-key hs-command-map (kbd "TAB") 'hs-toggle-hiding)
+    ;; Shift-TAB toggles the current block, local to prog buffers.
+    (define-key hs-minor-mode-map (kbd "<backtab>") 'hs-toggle-hiding))
 #+end_src
 
 ** Torrent
@@ -310,6 +334,9 @@ Press =C-c s= to open, =q= / =ESC= to dismiss, =g= to refresh in place.
 
 ** Dired
 #+begin_src emacs-lisp
+  ;; Deletions (dired's D/x included) go to the system trash, not oblivion.
+  (setq delete-by-moving-to-trash t)
+
   (use-package dired
     :ensure nil
     :hook (dired-mode . dired-hide-details-mode)
@@ -532,6 +559,13 @@ that checks the node type at point.
 #+begin_src emacs-lisp
   ;; Insert matching parentheses automatically
   (electric-pair-mode 1)
+  ;; Do not auto-insert the closing pair when the next char is a word
+  ;; or a closing delimiter (avoids "[]]" when typing "[" before "]")
+  (setq electric-pair-inhibit-predicate
+        (lambda (c)
+          (or (electric-pair-conservative-inhibit c)
+              (and (not (eobp))
+                   (eq (char-syntax (char-after)) ?\))))))
   ;; Highlight matching parentheses with zero delay
   (show-paren-mode 1)
   (setq show-paren-delay 0)
@@ -658,6 +692,12 @@ that checks the node type at point.
     ;; Add all your customizations prior to loading the themes
     (setq modus-themes-italic-constructs t
           modus-themes-bold-constructs nil)
+
+    ;; Line-number column blends into the main background (no gray block).
+    (setq modus-themes-common-palette-overrides
+          '((fringe unspecified)
+            (bg-line-number-inactive unspecified)
+            (bg-line-number-active unspecified)))
 
     ;; Load the theme of your choice.
     (modus-themes-load-theme 'modus-vivendi)
@@ -1056,15 +1096,16 @@ Ediff
 
 ** Chat (Telega)
 #+begin_src emacs-lisp
-  ;; Telega requires telega-server via Docker (zevlg/telega-server).
-  ;; Pull pre-built image:
-  ;;   docker pull zevlg/telega-server:latest
-  ;; Or rebuild locally from the Dockerfile in the telega repo:
-  ;;   cd ~/.emacs.d/elpaca/sources/telega
-  ;;   docker build -f etc/Dockerfile -t zevlg/telega-server:latest .
+  ;; telega-server is built locally against TDLib 1.8.66 installed in /usr/local:
+  ;;   cd ~/.emacs.d/elpaca/sources/telega/server && make clean && make && make install
+  ;; That installs to ~/.telega/telega-server. telega adds `telega-directory'
+  ;; to exec-path, so ~/.telega does not need to be in PATH.
+  ;; DEPRECATED: Docker mode. The zevlg/telega-server:latest image ships
+  ;; TDLib 1.8.63, below the 1.8.66 telega requires.
+  ;;   (setq telega-use-docker t)
   ;; Session data lives in ~/.telega/ (td.binlog holds auth state).
   (use-package telega
-    :init (setq telega-use-docker t))
+    :init (setq telega-use-docker nil))
 #+end_src
 
 * 🤖 AI
@@ -1078,24 +1119,57 @@ Ediff
   (claude-code-ide-emacs-tools-setup)) ; Optionally enable Emacs MCP tools
 #+end_src
 
+** Agent shell (ACP)
+
+ACP (Agent Client Protocol) client, on trial next to =claude-code-ide= above.
+Needs the adapter on PATH (=init.el= adds the nvm bin dir):
+
+#+begin_src sh :tangle no
+npm install -g @agentclientprotocol/claude-agent-acp
+#+end_src
+
+Authentication reuses the Claude Code CLI login, so no API key is needed.
+Start a session with =M-x agent-shell-anthropic-start-claude-code= (=C-c A=).
+
+#+begin_src emacs-lisp
+(use-package agent-shell
+  :bind ("C-c A" . agent-shell-anthropic-start-claude-code)
+  :config
+  (setq agent-shell-anthropic-authentication
+        (agent-shell-anthropic-make-authentication :login t))
+  ;; Default `minimal' resumes a session showing only its title, so the buffer
+  ;; looks empty. Replay the last turn to see where it left off.
+  (setq agent-shell-session-restore-verbosity 'last))
+#+end_src
+
+Sessions across all projects, which agent-shell's own picker cannot show (it
+filters by the current project's cwd). Defined in =claude-sessions.el=,
+autoloaded from =init.el=.
+
+#+begin_src emacs-lisp
+(global-set-key (kbd "C-c S") #'claude-sessions)
+#+end_src
+
 #+RESULTS:
 : [nil 27099 39639 511173 nil elpaca-process-queues nil nil 883000 nil]
 
 ** ellama
 #+begin_src emacs-lisp
+  ;; DEPRECATED 2026-08-17: ollama was removed from the system, so this
+  ;; provider has no backend. Delete once it is clear ellama is not coming back.
   ;; https://github.com/s-kostyaev/ellama
   ;; curl -fsSL https://ollama.com/install.sh | sh
   ;; Requires the `llm' package (pulled as a dependency of ellama).
-  (use-package ellama
-    :ensure t
-    :commands (ellama-chat ellama-ask-about ellama-summarize)
-    :config
-    (setopt ellama-language "Spanish")
-    ;; llm-ollama is part of the llm package; require only after ellama loads.
-    (require 'llm-ollama)
-    (setopt ellama-provider
-            (make-llm-ollama
-             :chat-model "deepseek-r1" :embedding-model "deepseek-r1")))
+  ;; (use-package ellama
+  ;;   :ensure t
+  ;;   :commands (ellama-chat ellama-ask-about ellama-summarize)
+  ;;   :config
+  ;;   (setopt ellama-language "Spanish")
+  ;;   ;; llm-ollama is part of the llm package; require only after ellama loads.
+  ;;   (require 'llm-ollama)
+  ;;   (setopt ellama-provider
+  ;;           (make-llm-ollama
+  ;;            :chat-model "deepseek-r1" :embedding-model "deepseek-r1")))
 #+end_src
 
 ** Backups

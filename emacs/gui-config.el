@@ -30,7 +30,7 @@
 ;; Fringe and window divider pixel faces
 ;; ============================================================================
 
-(set-face-attribute 'fringe nil :background "black")
+(set-face-attribute 'fringe nil :background 'unspecified)
 (set-face-attribute 'window-divider-first-pixel nil :foreground "gray40")
 (set-face-attribute 'window-divider-last-pixel nil :foreground "red")
 

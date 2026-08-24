@@ -34,16 +34,26 @@
 (add-hook 'icomplete-minibuffer-setup-hook
           (lambda () (setq-local truncate-lines t)))
 ;; RET accepts the selected candidate, like vertico. Exception: in a
-;; file prompt, when the input is a directory path and the selection
-;; has not been moved, take the input literally so RET in C-x d opens
-;; the prompted directory instead of the first match inside it (what
-;; vertico-preselect 'directory does).
+;; file prompt, when the selection has not been moved, take the input
+;; literally. This lets you create a file whose typed name is a prefix
+;; of an existing match (e.g. type "report" when "report-final.org"
+;; exists) instead of opening that match. To open an existing file,
+;; navigate to it first (C-n) or complete with TAB, then RET. Mirrors
+;; vertico-preselect 'prompt.
+(defun ao/icomplete--literal-input-p ()
+  "Non-nil when RET should take the typed input over the selected candidate.
+Empty input means empty: `icomplete-force-complete-and-exit' inserts the top
+candidate whatever the field holds, so with no text there is no way to clear
+a field, e.g. removing every tag at an org `C-c C-c' prompt puts the first
+tag back."
+  (or (string-empty-p (minibuffer-contents))
+      (and minibuffer-completing-file-name
+           (not icomplete--scrolled-completions))))
+
 (defun ao/icomplete-ret ()
-  "Exit with the selected candidate, or with a literal directory input."
+  "Exit with the selected candidate, or with the literal input."
   (interactive)
-  (if (and minibuffer-completing-file-name
-           (string-suffix-p "/" (minibuffer-contents))
-           (not icomplete--scrolled-completions))
+  (if (ao/icomplete--literal-input-p)
       (exit-minibuffer)
     (icomplete-force-complete-and-exit)))
 (define-key icomplete-minibuffer-map (kbd "RET") #'ao/icomplete-ret)
@@ -51,6 +61,30 @@
 (define-key icomplete-minibuffer-map (kbd "M-RET") #'icomplete-fido-exit)
 ;; TAB inserts the selected candidate without exiting (vertico's TAB).
 (define-key icomplete-minibuffer-map (kbd "TAB") #'icomplete-force-complete)
+
+;; icomplete always highlights its top candidate. Where RET takes the
+;; literal input instead (see ao/icomplete--literal-input-p) that highlight
+;; is misleading: it shows e.g. ".profile" as selected while RET would
+;; create "file", or a tag as selected while RET would clear the field.
+;; Hide it in those cases. Elsewhere the highlight stays, since there RET
+;; does take the candidate.
+(defvar-local ao/icomplete--noselect-cookie nil)
+(defun ao/icomplete--sync-selection-highlight ()
+  "Show the top-candidate highlight only when it reflects what RET picks."
+  (if (ao/icomplete--literal-input-p)
+      (unless ao/icomplete--noselect-cookie
+        (setq ao/icomplete--noselect-cookie
+              (face-remap-add-relative 'icomplete-selected-match 'default)))
+    (when ao/icomplete--noselect-cookie
+      (face-remap-remove-relative ao/icomplete--noselect-cookie)
+      (setq ao/icomplete--noselect-cookie nil))))
+(add-hook 'icomplete-minibuffer-setup-hook
+          (lambda ()
+            ;; Run late (depth 90) so icomplete-exhibit has refreshed
+            ;; icomplete--scrolled-completions before we read it.
+            (add-hook 'post-command-hook
+                      #'ao/icomplete--sync-selection-highlight 90 t)
+            (ao/icomplete--sync-selection-highlight)))
 
 ;; ------------------------------------------------------------
 ;; 3. Flexible Matching (Orderless)
