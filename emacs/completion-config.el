@@ -64,6 +64,24 @@ back."
 ;; TAB inserts the selected candidate without exiting (vertico's TAB).
 (define-key icomplete-minibuffer-map (kbd "TAB") #'icomplete-force-complete)
 
+;; From the prompt nothing is selected yet: the highlight is hidden and RET
+;; takes the input. `icomplete-forward-completions' pops the head of the list,
+;; so the first C-n there would step over the first candidate and land on the
+;; second. Mark the list as scrolled instead, leaving its head in place, which
+;; selects the first candidate. Vertico's `prompt' preselect moves this way.
+(defun ao/icomplete-forward-completions ()
+  "Step forward one candidate, or select the first one from the prompt."
+  (interactive)
+  (if (ao/icomplete--literal-input-p)
+      (setq icomplete--scrolled-completions
+            (completion-all-sorted-completions (icomplete--field-beg)
+                                               (icomplete--field-end)))
+    (icomplete-forward-completions)))
+(define-key icomplete-vertical-mode-minibuffer-map (kbd "C-n")
+            #'ao/icomplete-forward-completions)
+(define-key icomplete-vertical-mode-minibuffer-map (kbd "<down>")
+            #'ao/icomplete-forward-completions)
+
 ;; icomplete always highlights its top candidate. Where RET takes the
 ;; literal input instead (see ao/icomplete--literal-input-p) that highlight
 ;; is misleading: it shows e.g. ".profile" as selected while RET would
