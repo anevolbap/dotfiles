@@ -221,6 +221,13 @@
 ;; org-roam — personal knowledge base / zettelkasten
 ;; ============================================================================
 
+;; Problem/fix notes.  The `roam-problem' script (~/.local/bin) writes the same
+;; skeleton from a Claude Code session; this is the by-hand path.
+(defun ao/roam-capture-problem ()
+  "Capture a problem/fix note in the org-roam directory."
+  (interactive)
+  (org-roam-capture nil "p"))
+
 (use-package org-roam
   :ensure t
   ;; Defer until first roam command — avoids starting the SQLite DB watcher
@@ -233,11 +240,25 @@
   (org-roam-dailies-capture-templates
    '(("d" "default" entry "* %U %?"
       :target (file+head "%<%Y-%m-%d>.org" "#+title: %<%Y-%m-%d>\n"))))
+  (org-roam-capture-templates
+   '(("d" "default" plain "%?"
+      :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org"
+                         "#+title: ${title}\n")
+      :unnarrowed t)
+     ;; Fixed skeleton so problem notes stay comparable.  Keep the evidence:
+     ;; the command or log lines that proved the cause, and the one that
+     ;; proved the fix.
+     ("p" "problem / fix" plain
+      "* Symptom\n%?\n\n* Environment\n\n* Cause\n\n* Fix\n\n* Verified\n\n* Related\n"
+      :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org"
+                         "#+title: ${title}\n#+filetags: :problem:\n")
+      :unnarrowed t)))
   :bind (("C-c n l" . org-roam-buffer-toggle)
          ("C-c n f" . org-roam-node-find)
          ("C-c n i" . org-roam-node-insert)
          ("C-c n j" . org-roam-dailies-capture-today)
-         ("C-c n t" . org-roam-dailies-goto-today))
+         ("C-c n t" . org-roam-dailies-goto-today)
+         ("C-c n p" . ao/roam-capture-problem))
   :config
   (require 'org-roam-dailies)
   (org-roam-db-autosync-mode))
