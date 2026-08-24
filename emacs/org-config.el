@@ -52,8 +52,11 @@
   (org-todo-keyword-faces
    '(("EXPIRED"   . (:inherit shadow))))                ; dead/neutral
 
-  ;; Refile across all agenda files, up to 3 levels deep
-  (org-refile-targets '((org-agenda-files :maxlevel . 3)))
+  ;; Refile across all agenda files, up to 3 levels deep.
+  ;; Not `org-agenda-files' directly: claude-sessions.org is generated and lives
+  ;; in the org directory, so it is an agenda file, and nothing should ever be
+  ;; refiled into a file that gets rewritten wholesale.
+  (org-refile-targets '((ao/refile-files :maxlevel . 3)))
   (org-refile-use-outline-path 'file)
   (org-outline-path-complete-in-steps nil)
 
@@ -134,6 +137,16 @@
              ((org-agenda-overriding-header "\nActive TODOs\n")
               (org-agenda-skip-function
                '(org-agenda-skip-entry-if 'regexp "^[ \t]*:STYLE:[ \t]+habit"))))))
+     ;; Claude Code sessions. These entries carry no TODO keyword, so they show
+     ;; up in no other command here. Grouped by the PROJECT property rather than
+     ;; by tags, since org tags cannot contain the hyphen in e.g. my-project.
+     ("S" "Claude sessions by project"
+      tags "SESSION<>\"\""
+      ((org-super-agenda-groups '((:auto-property "PROJECT")))
+       (org-agenda-sorting-strategy '(user-defined-down))
+       (org-agenda-cmp-user-defined #'ao/agenda-cmp-updated)
+       (org-agenda-prefix-format '((tags . "  ")))
+       (org-agenda-overriding-header "Claude sessions")))
      ("A" "Daily agenda and top priority tasks"
       ((agenda "" ((org-agenda-span 1)
                    (org-deadline-warning-days 0)
@@ -159,7 +172,6 @@
   ;; Undone habits show with the `!' glyph and leave the agenda once marked DONE,
   ;; so an empty day agenda means done for the day. In the agenda, `K' toggles
   ;; habits off/on and `C-u K' shows the graphs of habits already done today.
-  ;;
   ;; A missed habit keeps its old SCHEDULED date, so it would be dropped by the
   ;; `org-scheduled-past-days' 0 in the "A" day block. Habits use this value
   ;; instead, so an overdue habit stays on today's agenda until it is done.
@@ -176,6 +188,89 @@
         (insert (format "#+begin_src %s\n\n#+end_src" lang))
         (forward-line -1)
         (end-of-line)))))
+
+;; ============================================================================
+;; Claude Code sessions in the agenda
+;;
+;; Sessions live in claude-sessions.org, written by M-x claude-sessions-org-sync.
+;; They are plain entries whose only timestamp sits in the :UPDATED: property,
+;; which keeps them out of every todo and date view but also defeats the stock
+;; recency sorts: `tsia-down' reads TIMESTAMP_IA, which is nil for a timestamp
+;; inside a property drawer, and is day-granular anyway. Hence a comparator.
+;; ============================================================================
+
+(defvar claude-sessions-org-file)
+(declare-function claude-sessions-org-sync "claude-sessions-org")
+
+;; org-agenda is deferred, so its options are not special variables when this
+;; file is compiled, and `let' binds them lexically instead of dynamically.
+;; The agenda functions then never see the bindings and silently use the global
+;; values. Declaring them special here fixes every `let' below, including the
+;; one in `ao/dashboard-upcoming-block'.
+(defvar org-agenda-cmp-user-defined)
+(defvar org-agenda-entry-types)
+(defvar org-agenda-overriding-header)
+(defvar org-agenda-prefix-format)
+(defvar org-agenda-show-all-dates)
+(defvar org-agenda-sorting-strategy)
+(defvar org-agenda-span)
+(defvar org-agenda-start-on-weekday)
+(defvar org-agenda-time-grid)
+(defvar org-scheduled-past-days)
+
+(defun ao/refile-files ()
+  "Agenda files minus the generated Claude sessions file.
+Excluding the file here rather than with `org-refile-target-verify-function'
+also drops the file-level target, which that hook never sees."
+  (seq-remove (lambda (file)
+                (and (boundp 'claude-sessions-org-file)
+                     claude-sessions-org-file
+                     (equal (expand-file-name file)
+                            (expand-file-name claude-sessions-org-file))))
+              (org-agenda-files)))
+
+(defun ao/agenda-updated-time (entry)
+  "Return the :UPDATED: time of agenda line ENTRY in seconds, or nil."
+  (when-let* ((marker (or (get-text-property 0 'org-hd-marker entry)
+                          (get-text-property 0 'org-marker entry)))
+              (value (org-entry-get marker "UPDATED")))
+    (ignore-errors (org-time-string-to-seconds value))))
+
+(defun ao/agenda-cmp-updated (a b)
+  "Compare agenda entries A and B by :UPDATED:, most recent first.
+Returns +1, -1 or nil as `org-agenda-cmp-user-defined' requires."
+  (let ((ta (ao/agenda-updated-time a))
+        (tb (ao/agenda-updated-time b)))
+    (cond ((and ta tb) (cond ((> ta tb) +1)
+                             ((< ta tb) -1)))
+          (ta +1)
+          (tb -1))))
+
+(defun ao/session-projects ()
+  "Return the distinct :PROJECT: values in `claude-sessions-org-file'."
+  (require 'claude-sessions-org)
+  (unless (file-readable-p claude-sessions-org-file)
+    (user-error "No session file yet; run M-x claude-sessions-org-sync"))
+  (let (projects)
+    (with-temp-buffer
+      (insert-file-contents claude-sessions-org-file)
+      (let ((org-inhibit-startup t)
+            (org-mode-hook nil))
+        (org-mode))
+      (org-map-entries
+       (lambda ()
+         (when-let* ((project (org-entry-get nil "PROJECT")))
+           (cl-pushnew project projects :test #'equal)))))
+    (sort projects (lambda (a b) (string-lessp (downcase a) (downcase b))))))
+
+(defun ao/sessions-for-project (project)
+  "Show Claude Code sessions for PROJECT, most recent first."
+  (interactive (list (completing-read "Project: " (ao/session-projects) nil t)))
+  (let ((org-agenda-sorting-strategy '(user-defined-down))
+        (org-agenda-cmp-user-defined #'ao/agenda-cmp-updated)
+        (org-agenda-prefix-format '((tags . "  ")))
+        (org-agenda-overriding-header (format "Sessions: %s" project)))
+    (org-tags-view nil (format "PROJECT=\"%s\"" project))))
 
 ;; Dashboard: upcoming agenda block that always inserts its section header.
 ;; An (agenda "") block silently omits its overriding-header when it produces
