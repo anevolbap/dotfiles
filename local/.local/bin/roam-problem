@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""
+roam-problem — write a problem/fix note into the org-roam directory.
+
+Meant to be called at the end of a Claude Code debugging session: the body
+comes from stdin, the file scaffolding (org-id, title, filetags, session
+properties) is added here.
+
+    roam-problem "xfce4-power-manager and logind race on lid close" \
+        --tags xfce,systemd <<'EOF'
+    * Symptom
+    ...
+    EOF
+
+The session id defaults to $CLAUDE_CODE_SESSION_ID, which ties the note to
+the entries in claude-sessions.org.
+
+org-roam-db-autosync-mode only watches saves made inside Emacs, so a file
+written from a shell stays invisible to org-roam-node-find until the database
+is synced.  This tries emacsclient; if no server is running, the next
+org-roam command in a fresh Emacs runs a full sync anyway.
+"""
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+import time
+import uuid
+
+ROAM_DIR = os.path.expanduser("~/org/roam-notes")
+
+
+def slugify(title):
+    slug = re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")
+    return slug[:60] or "note"
+
+
+def main():
+    p = argparse.ArgumentParser(description="Write a problem/fix org-roam note.")
+    p.add_argument("title")
+    p.add_argument("--tags", default="", help="extra filetags, comma separated")
+    p.add_argument("--session", default=os.environ.get("CLAUDE_CODE_SESSION_ID", ""))
+    p.add_argument("--project", default="", help="project name, e.g. dotfiles")
+    args = p.parse_args()
+
+    body = sys.stdin.read().rstrip()
+    if not body:
+        sys.exit("roam-problem: empty body on stdin")
+
+    tags = ["problem"] + [t.strip() for t in args.tags.split(",") if t.strip()]
+    path = os.path.join(
+        ROAM_DIR, f"{time.strftime('%Y%m%d%H%M%S')}-{slugify(args.title)}.org"
+    )
+
+    props = [f":ID:       {str(uuid.uuid4()).upper()}"]
+    if args.session:
+        props.append(f":SESSION:  {args.session}")
+    if args.project:
+        props.append(f":PROJECT:  {args.project}")
+    props.append(f":CREATED:  [{time.strftime('%Y-%m-%d %a %H:%M')}]")
+
+    with open(path, "x") as f:
+        f.write(":PROPERTIES:\n")
+        f.write("\n".join(props) + "\n")
+        f.write(":END:\n")
+        f.write(f"#+title: {args.title}\n")
+        f.write(f"#+filetags: :{':'.join(tags)}:\n\n")
+        f.write(body + "\n")
+
+    subprocess.run(
+        ["emacsclient", "-e", "(org-roam-db-sync)"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    print(path)
+
+
+if __name__ == "__main__":
+    main()
