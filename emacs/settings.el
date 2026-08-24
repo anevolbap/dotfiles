@@ -1,5 +1,12 @@
 ;;; -*- lexical-binding: t -*-
 
+(use-package speedbar
+  :ensure nil
+  :commands (speedbar)
+  :config
+  (setq speedbar-prefer-window t)
+  (setq speedbar-use-images nil))
+
 (use-package ibuffer :ensure nil
   :config
   (setq ibuffer-expert t)
@@ -113,17 +120,33 @@
 (use-package expreg
   :ensure t)
 
-(use-package kirigami
-  :ensure t
+;; DEPRECATED: kirigami replaced by built-in hideshow. Remove once confirmed.
+;; (use-package kirigami
+;;   :ensure t
+;;   :config
+;;   (define-prefix-command 'kirigami-command-map)
+;;   (global-set-key (kbd "C-c f") 'kirigami-command-map)
+;;   (define-key kirigami-command-map (kbd "o")   'kirigami-open-fold)
+;;   (define-key kirigami-command-map (kbd "O")   'kirigami-open-fold-rec)
+;;   (define-key kirigami-command-map (kbd "c")   'kirigami-close-fold)
+;;   (define-key kirigami-command-map (kbd "m")   'kirigami-close-folds)
+;;   (define-key kirigami-command-map (kbd "r")   'kirigami-open-folds)
+;;   (define-key kirigami-command-map (kbd "TAB") 'kirigami-toggle-fold))
+
+(use-package hideshow
+  :ensure nil
+  :hook (prog-mode . hs-minor-mode)
   :config
-  (define-prefix-command 'kirigami-command-map)
-  (global-set-key (kbd "C-c f") 'kirigami-command-map)
-  (define-key kirigami-command-map (kbd "o")   'kirigami-open-fold)
-  (define-key kirigami-command-map (kbd "O")   'kirigami-open-fold-rec)
-  (define-key kirigami-command-map (kbd "c")   'kirigami-close-fold)
-  (define-key kirigami-command-map (kbd "m")   'kirigami-close-folds)
-  (define-key kirigami-command-map (kbd "r")   'kirigami-open-folds)
-  (define-key kirigami-command-map (kbd "TAB") 'kirigami-toggle-fold))
+  (define-prefix-command 'hs-command-map)
+  (global-set-key (kbd "C-c f") 'hs-command-map)
+  (define-key hs-command-map (kbd "o")   'hs-show-block)
+  (define-key hs-command-map (kbd "c")   'hs-hide-block)
+  (define-key hs-command-map (kbd "m")   'hs-hide-all)
+  (define-key hs-command-map (kbd "r")   'hs-show-all)
+  (define-key hs-command-map (kbd "l")   'hs-hide-level)
+  (define-key hs-command-map (kbd "TAB") 'hs-toggle-hiding)
+  ;; Shift-TAB toggles the current block, local to prog buffers.
+  (define-key hs-minor-mode-map (kbd "<backtab>") 'hs-toggle-hiding))
 
 ;; transmission: manage Transmission BitTorrent daemon from Emacs.
 ;; Requires a running Transmission daemon:
@@ -213,6 +236,9 @@
 (setq world-clock-time-format "%a, %d %b %I:%M %p %Z")
 
 (global-set-key (kbd "C-c s") #'dashboard-show)
+
+;; Deletions (dired's D/x included) go to the system trash, not oblivion.
+(setq delete-by-moving-to-trash t)
 
 (use-package dired
   :ensure nil
@@ -392,6 +418,13 @@ where `syntax-ppss' does not reliably identify node types."
 
 ;; Insert matching parentheses automatically
 (electric-pair-mode 1)
+;; Do not auto-insert the closing pair when the next char is a word
+;; or a closing delimiter (avoids "[]]" when typing "[" before "]")
+(setq electric-pair-inhibit-predicate
+      (lambda (c)
+        (or (electric-pair-conservative-inhibit c)
+            (and (not (eobp))
+                 (eq (char-syntax (char-after)) ?\))))))
 ;; Highlight matching parentheses with zero delay
 (show-paren-mode 1)
 (setq show-paren-delay 0)
@@ -491,6 +524,12 @@ where `syntax-ppss' does not reliably identify node types."
   ;; Add all your customizations prior to loading the themes
   (setq modus-themes-italic-constructs t
         modus-themes-bold-constructs nil)
+
+  ;; Line-number column blends into the main background (no gray block).
+  (setq modus-themes-common-palette-overrides
+        '((fringe unspecified)
+          (bg-line-number-inactive unspecified)
+          (bg-line-number-active unspecified)))
 
   ;; Load the theme of your choice.
   (modus-themes-load-theme 'modus-vivendi)
@@ -819,15 +858,16 @@ where `syntax-ppss' does not reliably identify node types."
 
 (setq tramp-default-method "ssh")
 
-;; Telega requires telega-server via Docker (zevlg/telega-server).
-;; Pull pre-built image:
-;;   docker pull zevlg/telega-server:latest
-;; Or rebuild locally from the Dockerfile in the telega repo:
-;;   cd ~/.emacs.d/elpaca/sources/telega
-;;   docker build -f etc/Dockerfile -t zevlg/telega-server:latest .
+;; telega-server is built locally against TDLib 1.8.66 installed in /usr/local:
+;;   cd ~/.emacs.d/elpaca/sources/telega/server && make clean && make && make install
+;; That installs to ~/.telega/telega-server. telega adds `telega-directory'
+;; to exec-path, so ~/.telega does not need to be in PATH.
+;; DEPRECATED: Docker mode. The zevlg/telega-server:latest image ships
+;; TDLib 1.8.63, below the 1.8.66 telega requires.
+;;   (setq telega-use-docker t)
 ;; Session data lives in ~/.telega/ (td.binlog holds auth state).
 (use-package telega
-  :init (setq telega-use-docker t))
+  :init (setq telega-use-docker nil))
 
 (use-package claude-code-ide
   :vc (:url "https://github.com/manzaltu/claude-code-ide.el" :rev :newest)
@@ -835,19 +875,32 @@ where `syntax-ppss' does not reliably identify node types."
   :config
   (claude-code-ide-emacs-tools-setup)) ; Optionally enable Emacs MCP tools
 
+(use-package agent-shell
+  :bind ("C-c A" . agent-shell-anthropic-start-claude-code)
+  :config
+  (setq agent-shell-anthropic-authentication
+        (agent-shell-anthropic-make-authentication :login t))
+  ;; Default `minimal' resumes a session showing only its title, so the buffer
+  ;; looks empty. Replay the last turn to see where it left off.
+  (setq agent-shell-session-restore-verbosity 'last))
+
+(global-set-key (kbd "C-c S") #'claude-sessions)
+
+;; DEPRECATED 2026-08-17: ollama was removed from the system, so this
+;; provider has no backend. Delete once it is clear ellama is not coming back.
 ;; https://github.com/s-kostyaev/ellama
 ;; curl -fsSL https://ollama.com/install.sh | sh
 ;; Requires the `llm' package (pulled as a dependency of ellama).
-(use-package ellama
-  :ensure t
-  :commands (ellama-chat ellama-ask-about ellama-summarize)
-  :config
-  (setopt ellama-language "Spanish")
-  ;; llm-ollama is part of the llm package; require only after ellama loads.
-  (require 'llm-ollama)
-  (setopt ellama-provider
-          (make-llm-ollama
-           :chat-model "deepseek-r1" :embedding-model "deepseek-r1")))
+;; (use-package ellama
+;;   :ensure t
+;;   :commands (ellama-chat ellama-ask-about ellama-summarize)
+;;   :config
+;;   (setopt ellama-language "Spanish")
+;;   ;; llm-ollama is part of the llm package; require only after ellama loads.
+;;   (require 'llm-ollama)
+;;   (setopt ellama-provider
+;;           (make-llm-ollama
+;;            :chat-model "deepseek-r1" :embedding-model "deepseek-r1")))
 
 ;; Redirect backup and auto-save files to ~/.emacs.d/ so they never
 ;; scatter tilde files across project directories.
