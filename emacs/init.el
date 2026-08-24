@@ -31,11 +31,24 @@
 ;; Additional exec-path entries for tools not on the system PATH.
 ;; Also keep $PATH in sync so subprocesses (vterm, eshell, sh -c ...) see them.
 ;; Needed for daemon mode, where $PATH is not inherited from a login shell.
-(dolist (dir '("~/.local/bin" "~/.pyenv/bin"))
-  (let ((d (expand-file-name dir)))
-    (add-to-list 'exec-path d)
-    (unless (member d (split-string (or (getenv "PATH") "") ":"))
-      (setenv "PATH" (concat d ":" (getenv "PATH"))))))
+;; nvm is only sourced from .bashrc, so node and its global npm binaries
+;; (claude-agent-acp) are invisible to daemon Emacs. Resolve the bin dir of the
+;; version named in ~/.nvm/alias/default instead of hardcoding it.
+(let* ((alias (expand-file-name "~/.nvm/alias/default"))
+       (version (and (file-readable-p alias)
+                     (string-trim (with-temp-buffer
+                                    (insert-file-contents alias)
+                                    (buffer-string)))))
+       (nvm-bin (and version
+                     (car (last (file-expand-wildcards
+                                 (expand-file-name
+                                  (format "~/.nvm/versions/node/v%s*/bin"
+                                          version))))))))
+  (dolist (dir (delq nil (list "~/.local/bin" "~/.pyenv/bin" nvm-bin)))
+    (let ((d (expand-file-name dir)))
+      (add-to-list 'exec-path d)
+      (unless (member d (split-string (or (getenv "PATH") "") ":"))
+        (setenv "PATH" (concat d ":" (getenv "PATH")))))))
 
 ;; Load custom file
 (setq-default custom-file (concat user-emacs-directory "custom.el"))
