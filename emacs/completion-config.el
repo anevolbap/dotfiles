@@ -42,13 +42,15 @@
 ;; vertico-preselect 'prompt.
 (defun ao/icomplete--literal-input-p ()
   "Non-nil when RET should take the typed input over the selected candidate.
-Empty input means empty: `icomplete-force-complete-and-exit' inserts the top
-candidate whatever the field holds, so with no text there is no way to clear
-a field, e.g. removing every tag at an org `C-c C-c' prompt puts the first
-tag back."
-  (or (string-empty-p (minibuffer-contents))
-      (and minibuffer-completing-file-name
-           (not icomplete--scrolled-completions))))
+Moving the selection (C-n, C-p) settles the question: the pick is deliberate,
+so RET takes the candidate and the highlight stays on. Until then, empty input
+means empty, since `icomplete-force-complete-and-exit' inserts the top
+candidate whatever the field holds, so with no text there is no way to clear a
+field, e.g. removing every tag at an org `C-c C-c' prompt puts the first tag
+back."
+  (and (not icomplete--scrolled-completions)
+       (or (string-empty-p (minibuffer-contents))
+           minibuffer-completing-file-name)))
 
 (defun ao/icomplete-ret ()
   "Exit with the selected candidate, or with the literal input."
