@@ -122,26 +122,25 @@
 (unless (display-graphic-p)
   (setenv "GPG_TTY" (string-trim (shell-command-to-string "tty"))))
 
-;; Env variables
-(use-package exec-path-from-shell
-  :demand t
-  :config
-  ;; Specify the environment variables ECA needs
-  (setq exec-path-from-shell-variables
-        '("ANTHROPIC_API_KEY"
-          "OPENAI_API_KEY"
-          "OLLAMA_API_BASE"
-          "OPENAI_API_URL"
-          "ANTHROPIC_API_URL"
-          "ECA_CONFIG"
-          "XDG_CONFIG_HOME"
-          "PATH"
-          "MANPATH"))
-  (setq exec-path-from-shell-debug nil)
-  (dolist (var '("SHELL" "SSH_AUTH_SOCK" "SSH_AGENT_PID" "PATH" "HOME" "LSP_USE_PLISTS"))
-    (add-to-list 'exec-path-from-shell-variables var))
-    ;; Only needed on macOS where GUI Emacs doesn't inherit shell env
-  (when (memq window-system '(mac ns))
+;; Env variables — only needed on macOS where GUI Emacs doesn't inherit shell
+;; env. On Linux $PATH is already set up above, so skip loading the package.
+(when (memq window-system '(mac ns))
+  (use-package exec-path-from-shell
+    :demand t
+    :config
+    ;; Specify the environment variables ECA needs
+    (setq exec-path-from-shell-variables
+          '("ANTHROPIC_API_KEY"
+            "OPENAI_API_KEY"
+            "OPENAI_API_URL"
+            "ANTHROPIC_API_URL"
+            "ECA_CONFIG"
+            "XDG_CONFIG_HOME"
+            "PATH"
+            "MANPATH"))
+    (setq exec-path-from-shell-debug nil)
+    (dolist (var '("SHELL" "SSH_AUTH_SOCK" "SSH_AGENT_PID" "PATH" "HOME" "LSP_USE_PLISTS"))
+      (add-to-list 'exec-path-from-shell-variables var))
     (exec-path-from-shell-initialize)))
 
 
