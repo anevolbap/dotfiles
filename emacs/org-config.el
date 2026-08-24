@@ -47,6 +47,11 @@
   (org-todo-keywords
    '((sequence "TODO(t)" "IN-PROGRESS(i)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)")))
 
+  ;; Per-keyword colors. Inherit theme faces instead of hardcoding hex, so the
+  ;; palette follows the theme (light/dark).
+  (org-todo-keyword-faces
+   '(("EXPIRED"   . (:inherit shadow))))                ; dead/neutral
+
   ;; Refile across all agenda files, up to 3 levels deep
   (org-refile-targets '((org-agenda-files :maxlevel . 3)))
   (org-refile-use-outline-path 'file)
