@@ -102,8 +102,20 @@
        (tags-todo "-read"
                   ((org-agenda-overriding-header "Active TODOs (top 5 by latest update)")
                    (org-agenda-sorting-strategy '(tsia-down))
+                   (org-agenda-skip-function
+                    '(org-agenda-skip-entry-if 'regexp "^[ \t]*:STYLE:[ \t]+habit"))
                    (org-agenda-max-entries 5)))))
      ("l" "Reading list" tags-todo "read")
+     ;; Habits (STYLE: habit in habits.org). Only today's line is shown, with
+     ;; the consistency graph; `org-habit-graph-column' sets where it starts.
+     ("h" "Habits"
+      ((agenda "" ((org-agenda-span 1)
+                   (org-agenda-entry-types '(:scheduled))
+                   (org-agenda-time-grid nil)
+                   (org-agenda-format-date "%A %-e %B %Y")
+                   (org-agenda-skip-function
+                    '(org-agenda-skip-entry-if 'notregexp "^[ \t]*:STYLE:[ \t]+habit"))
+                   (org-agenda-overriding-header "\nHabits\n")))))
      ("u" "Upcoming (next 14 days)"
       ((agenda "" ((org-agenda-span 14)
                    (org-agenda-start-on-weekday nil)
@@ -114,7 +126,9 @@
                    (org-agenda-overriding-header "\nUpcoming (+14d)\n")))))
      ("t" "All active TODOs"
       ((todo "TODO|IN-PROGRESS|WAITING"
-             ((org-agenda-overriding-header "\nActive TODOs\n")))))
+             ((org-agenda-overriding-header "\nActive TODOs\n")
+              (org-agenda-skip-function
+               '(org-agenda-skip-entry-if 'regexp "^[ \t]*:STYLE:[ \t]+habit"))))))
      ("A" "Daily agenda and top priority tasks"
       ((agenda "" ((org-agenda-span 1)
                    (org-deadline-warning-days 0)
@@ -136,8 +150,16 @@
   (add-to-list 'org-modules 'org-habit t)
   (add-to-list 'org-modules 'org-protocol t) ; browser capture via org-protocol://
 
-  ;; org-habit: show graph only for today; keep graph narrow
+  ;; org-habit: show habits only on today's agenda line; keep graph narrow.
+  ;; Undone habits show with the `!' glyph and leave the agenda once marked DONE,
+  ;; so an empty day agenda means done for the day. In the agenda, `K' toggles
+  ;; habits off/on and `C-u K' shows the graphs of habits already done today.
+  ;;
+  ;; A missed habit keeps its old SCHEDULED date, so it would be dropped by the
+  ;; `org-scheduled-past-days' 0 in the "A" day block. Habits use this value
+  ;; instead, so an overdue habit stays on today's agenda until it is done.
   (setq org-habit-show-habits-only-for-today t
+        org-habit-scheduled-past-days 10000
         org-habit-graph-column 50
         org-habit-preceding-days 14
         org-habit-following-days 7)
