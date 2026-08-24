@@ -321,7 +321,9 @@
   ;; Enable time and battery display directly — with-eval-after-load 'time
   ;; would never fire unless something else loaded the `time' library first.
   (display-time-mode 1)
-  (display-battery-mode 1)
+  ;; Deferred: probing the battery at startup costs ~0.29s of a 1.3s startup,
+  ;; for an indicator that is not readable until the frame exists anyway.
+  (run-with-idle-timer 1 nil #'display-battery-mode)
 
   ;; VC branch: show just the branch name without "Git:" prefix (Emacs 30+)
   (setq vc-display-status 'no-backend)
@@ -475,7 +477,9 @@ where `syntax-ppss' does not reliably identify node types."
 
 ;; winner-mode: C-c <left>/<right> to undo/redo window layout changes.
 ;; These are the default winner bindings — setting them explicitly for clarity.
-(winner-mode 1)
+;; Deferred: loading winner.el costs ~0.03s at startup. Layout changes made
+;; in the first idle second are not recorded.
+(run-with-idle-timer 1 nil #'winner-mode)
 (global-set-key (kbd "C-c <right>") 'winner-redo)
 (global-set-key (kbd "C-c <left>")  'winner-undo)
 
@@ -575,12 +579,14 @@ where `syntax-ppss' does not reliably identify node types."
   :hook
   ;; Save breakpoints on quit
   (kill-emacs . dape-breakpoint-save)
-  ;; Load breakpoints on startup
-  (after-init . dape-breakpoint-load)
+  ;; DEPRECATED: loading breakpoints on startup pulled dape (and tramp, gdb-mi)
+  ;; into every session. Run M-x dape-breakpoint-load by hand instead.
+  ;; (after-init . dape-breakpoint-load)
 
   :custom
-  ;; Turn on global bindings for setting breakpoints with mouse
-  (dape-breakpoint-global-mode t)
+  ;; DEPRECATED: `:custom' on a global minor mode calls the mode function, which
+  ;; loads dape at startup. Moved to `:config' below so it turns on with dape.
+  ;; (dape-breakpoint-global-mode t)
 
   ;; Info buffers to the right
   (dape-buffer-window-arrangement 'right)
@@ -589,6 +595,9 @@ where `syntax-ppss' does not reliably identify node types."
   (dape-inline-variables t)
 
   :config
+  ;; Global bindings for setting breakpoints with mouse
+  (dape-breakpoint-global-mode 1)
+
   ;; Pulse source line (slight performance hit)
   (add-hook 'dape-display-source-hook #'pulse-momentary-highlight-one-line)
 
