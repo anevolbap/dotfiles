@@ -42,13 +42,15 @@
 ;; vertico-preselect 'prompt.
 (defun ao/icomplete--literal-input-p ()
   "Non-nil when RET should take the typed input over the selected candidate.
-Empty input means empty: `icomplete-force-complete-and-exit' inserts the top
-candidate whatever the field holds, so with no text there is no way to clear
-a field, e.g. removing every tag at an org `C-c C-c' prompt puts the first
-tag back."
-  (or (string-empty-p (minibuffer-contents))
-      (and minibuffer-completing-file-name
-           (not icomplete--scrolled-completions))))
+Moving the selection (C-n, C-p) settles the question: the pick is deliberate,
+so RET takes the candidate and the highlight stays on. Until then, empty input
+means empty, since `icomplete-force-complete-and-exit' inserts the top
+candidate whatever the field holds, so with no text there is no way to clear a
+field, e.g. removing every tag at an org `C-c C-c' prompt puts the first tag
+back."
+  (and (not icomplete--scrolled-completions)
+       (or (string-empty-p (minibuffer-contents))
+           minibuffer-completing-file-name)))
 
 (defun ao/icomplete-ret ()
   "Exit with the selected candidate, or with the literal input."
@@ -61,6 +63,24 @@ tag back."
 (define-key icomplete-minibuffer-map (kbd "M-RET") #'icomplete-fido-exit)
 ;; TAB inserts the selected candidate without exiting (vertico's TAB).
 (define-key icomplete-minibuffer-map (kbd "TAB") #'icomplete-force-complete)
+
+;; From the prompt nothing is selected yet: the highlight is hidden and RET
+;; takes the input. `icomplete-forward-completions' pops the head of the list,
+;; so the first C-n there would step over the first candidate and land on the
+;; second. Mark the list as scrolled instead, leaving its head in place, which
+;; selects the first candidate. Vertico's `prompt' preselect moves this way.
+(defun ao/icomplete-forward-completions ()
+  "Step forward one candidate, or select the first one from the prompt."
+  (interactive)
+  (if (ao/icomplete--literal-input-p)
+      (setq icomplete--scrolled-completions
+            (completion-all-sorted-completions (icomplete--field-beg)
+                                               (icomplete--field-end)))
+    (icomplete-forward-completions)))
+(define-key icomplete-vertical-mode-minibuffer-map (kbd "C-n")
+            #'ao/icomplete-forward-completions)
+(define-key icomplete-vertical-mode-minibuffer-map (kbd "<down>")
+            #'ao/icomplete-forward-completions)
 
 ;; icomplete always highlights its top candidate. Where RET takes the
 ;; literal input instead (see ao/icomplete--literal-input-p) that highlight
