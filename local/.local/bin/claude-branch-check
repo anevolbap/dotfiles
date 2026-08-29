@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""PreToolUse hook: block git commits on shared branches.
+
+Reads the Claude Code hook JSON on stdin. If the command commits on a shared
+branch (main, master, develop, gallery), exits 2 to block the tool call and
+surfaces the reason to the model. Otherwise exits 0 and prints the current
+branch so the model knows where it is committing.
+
+The branch is read from the repository the commit actually runs in, which is
+not always the session's cwd: a command may target another repository with
+`git -C <path>` or with a `cd <path> &&` prefix.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import subprocess
+import sys
+
+
+SHARED_BRANCHES = {"main", "master", "develop", "gallery"}
+
+# A commit invocation, optionally preceded by `-C <path>`.
+COMMIT_RE = re.compile(r"\bgit\s+(?:-C\s+(?P<dir>'[^']*'|\"[^\"]*\"|\S+)\s+)?commit\b")
+
+# A `cd <path>` at the start of the command or of a chained segment.
+CD_RE = re.compile(r"(?:^|&&|\|\||;)\s*cd\s+(?P<dir>'[^']*'|\"[^\"]*\"|\S+)")
+
+# Plumbing that is not a commit to a branch.
+PLUMBING_RE = re.compile(r"\bgit\s+commit-(tree|graph)\b")
+
+
+def _resolve(value: str, base: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+        value = value[1:-1]
+    value = os.path.expanduser(value)
+    if not os.path.isabs(value):
+        value = os.path.join(base, value)
+    return value
+
+
+def _commit_dir(cmd: str, cwd: str) -> str:
+    """Return the directory the commit in `cmd` will run in."""
+    match = COMMIT_RE.search(cmd)
+    if match is None:
+        return cwd
+
+    # An explicit -C path wins: it overrides any earlier cd.
+    if match.group("dir"):
+        return _resolve(match.group("dir"), cwd)
+
+    # Otherwise the last cd before the commit decides.
+    target = cwd
+    for cd_match in CD_RE.finditer(cmd):
+        if cd_match.start() > match.start():
+            break
+        target = _resolve(cd_match.group("dir"), target)
+    return target
+
+
+def main() -> int:
+    try:
+        data = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        return 0
+
+    if data.get("tool_name") != "Bash":
+        return 0
+
+    cmd = data.get("tool_input", {}).get("command", "")
+    if not COMMIT_RE.search(cmd):
+        return 0
+    if PLUMBING_RE.search(cmd):
+        return 0
+
+    cwd = data.get("cwd") or "."
+    try:
+        branch = subprocess.check_output(
+            ["git", "-C", _commit_dir(cmd, cwd), "branch", "--show-current"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return 0
+
+    if not branch:
+        return 0
+
+    if branch in SHARED_BRANCHES:
+        sys.stderr.write(
+            f"Refusing to commit on shared branch '{branch}'. "
+            "Switch to a feature branch first.\n"
+        )
+        return 2
+
+    print(f"Committing on branch: {branch}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
