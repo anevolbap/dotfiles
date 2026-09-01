@@ -22,13 +22,22 @@ level where it broke is visible: firmware, kernel, GPU, or session.
     sleep-doctor -v           evidence for every cycle, not just the bad ones
     sleep-doctor --tail 40    raw last lines of each boot that was hard reset
     sleep-doctor --config     only the static checks
+    sleep-doctor --agent      hand the full report to claude -p and let it dig
+
+Reach for --agent when a cycle resumed with no GPU error, since from there the
+answer is not in the summary: it is in the session config, and the agent can go
+read it.  For everything else the verdict on its own is enough.
 
 Needs read access to the journal (group systemd-journal), no root.
 """
 
 import argparse
+import contextlib
+import io
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timedelta
@@ -305,6 +314,66 @@ def config_report():
             print(f"    {line[:150]}")
 
 
+AGENT_PROMPT = """\
+The text after this line is the output of sleep-doctor, which reads the systemd
+journal after this laptop failed to come back from sleep and had to be power
+cycled.
+
+Machine: {machine}
+
+Work out where the resume broke and say what to check or change next.  The
+verdicts already narrow it down.  "no-resume" means the kernel never logged an
+exit, so the fault is firmware or the s2idle path and nothing in the desktop
+session matters.  "hard-reset" means the kernel resumed and the boot still
+ended with no shutdown logged, which is the black screen.
+
+For a hard-reset cycle with GPU error lines, the display driver is the suspect.
+For one with no GPU error, the kernel and the driver both came back, so the
+fault is above them in X, the screen locker or the session: read the relevant
+config on this machine before you answer instead of guessing.
+
+Be concrete.  Name the file, the setting, or the command to run.  Say which of
+your claims you checked on this machine and which are guesses.
+"""
+
+
+def machine_context():
+    """One line describing the machine, so the agent does not have to ask."""
+    distro = ""
+    for line in read("/etc/os-release").splitlines():
+        if line.startswith("PRETTY_NAME="):
+            distro = line.split("=", 1)[1].strip('"')
+    modules = read("/proc/modules")
+    drivers = [d for d in ("amdgpu", "i915", "nouveau", "nvidia")
+               if re.search(rf"^{d} ", modules, re.M)]
+    return ", ".join([
+        distro or "unknown distro",
+        f"kernel {read('/proc/sys/kernel/osrelease')}",
+        os.environ.get("XDG_CURRENT_DESKTOP", "unknown desktop"),
+        os.environ.get("XDG_SESSION_TYPE", "unknown session type"),
+        f"gpu driver {'/'.join(drivers) or 'unknown'}",
+    ])
+
+
+def ask_agent(report):
+    """Hand the report to claude -p and let its answer go straight to the terminal."""
+    claude = shutil.which("claude")
+    if not claude:
+        print(report)
+        sys.exit("claude is not on PATH, so the report above went nowhere")
+    prompt = AGENT_PROMPT.format(machine=machine_context())
+    return subprocess.run([claude, "-p", prompt], input=report,
+                          text=True, check=False).returncode
+
+
+def build_report(args):
+    bs = boots(args.boots)
+    print(f"Sleep cycles over the last {len(bs)} boot(s)\n")
+    for b in bs:
+        report_boot(b, args)
+    config_report()
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -317,17 +386,28 @@ def main():
     ap.add_argument("--max-lines", type=int, default=25,
                     help="evidence lines per cycle (default 25)")
     ap.add_argument("--config", action="store_true", help="only the static checks")
+    ap.add_argument("--agent", action="store_true",
+                    help="send the full report to claude -p and print its answer")
     args = ap.parse_args()
 
-    if args.config:
+    if args.config and not args.agent:
         config_report()
         return
 
-    bs = boots(args.boots)
-    print(f"Sleep cycles over the last {len(bs)} boot(s)\n")
-    for b in bs:
-        report_boot(b, args)
-    config_report()
+    if not args.agent:
+        build_report(args)
+        return
+
+    # The agent gets everything worth having, whatever the flags say.
+    args.verbose = True
+    args.tail = args.tail or 40
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        build_report(args)
+    print(f"sent {buf.getvalue().count(chr(10))} lines to claude, "
+          f"same as: sleep-doctor -n {args.boots} -v --tail {args.tail}\n",
+          flush=True)
+    sys.exit(ask_agent(buf.getvalue()))
 
 
 if __name__ == "__main__":
