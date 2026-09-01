@@ -1,0 +1,334 @@
+#!/usr/bin/env python3
+"""
+sleep-doctor — find out why a resume from suspend or hibernation ended in a
+black screen and a forced reboot.
+
+Run it after the reboot.  It walks the persistent journal, pairs every
+"PM: suspend entry" with its "PM: suspend exit", and says what happened to
+each cycle:
+
+    ok             resumed, and the boot went on or shut down cleanly
+    no-resume      the kernel went to sleep and never logged an exit
+    hard-reset     the kernel resumed, then the boot ended with no shutdown
+
+The last one is the black screen case: the machine is alive, the display
+never comes back, and the only way out is the power button.  For those
+cycles the script prints the evidence from the window after the resume
+(GPU errors, display manager churn, key presses that went nowhere) so the
+level where it broke is visible: firmware, kernel, GPU, or session.
+
+    sleep-doctor              last 5 boots, one line per bad cycle
+    sleep-doctor -n 20        look further back
+    sleep-doctor -v           evidence for every cycle, not just the bad ones
+    sleep-doctor --tail 40    raw last lines of each boot that was hard reset
+    sleep-doctor --config     only the static checks
+
+Needs read access to the journal (group systemd-journal), no root.
+"""
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+
+# Lines worth quoting from the window after a resume, most specific first.
+MARKERS = [
+    ("gpu", r"\[drm(:[^\]]*)?\] ?\*?ERROR|amdgpu[^\n]*(error|failed|reset|hang|timeout|timed out)"
+            r"|GPU reset|flip_done timed out|ring [a-z0-9_.]+ timeout|i915[^\n]*(error|hang)"),
+    ("firmware", r"ACPI (Error|BIOS Error|Exception)|PM: [^\n]*(failed|error)"
+                 r"|Freezing[^\n]*abort|suspend[^\n]*failed"),
+    ("session", r"(New|Removed) session|lightdm|light-locker|gdm|greeter"
+                r"|Xorg|X server|xfce4-session|display-manager"),
+    ("input", r"(Power|Suspend|Hibernate) key pressed|Lid (opened|closed)"),
+    ("storage", r"nvme[^\n]*(reset|timeout|I/O error)|EXT4-fs error|task [^\n]* blocked for more than"),
+]
+
+# Noise that matches the patterns above but never explains a black screen.
+NOISE = re.compile(r"UFW BLOCK|tailscaled|MediaEndpoint|CRON\[|anacron|avahi-daemon"
+                   r"|wpa_supplicant|systemd-timesyncd")
+
+
+def run(cmd):
+    """Return stdout, or an empty string if the command failed."""
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        return ""
+    return p.stdout
+
+
+def read(path, default=""):
+    try:
+        return Path(path).read_text().strip()
+    except OSError:
+        return default
+
+
+def stamp(usec):
+    return datetime.fromtimestamp(int(usec) / 1_000_000)
+
+
+def human(delta):
+    s = int(delta.total_seconds())
+    if s < 60:
+        return f"{s}s"
+    if s < 3600:
+        return f"{s // 60}m{s % 60:02d}s"
+    return f"{s // 3600}h{(s % 3600) // 60:02d}m"
+
+
+def boots(limit):
+    out = run(["journalctl", "--list-boots", "-o", "json"])
+    if not out.strip():
+        sys.exit("cannot read the journal: is /var/log/journal there, "
+                 "and are you in group systemd-journal?")
+    data = json.loads(out)
+    for b in data:
+        b["first"] = stamp(b["first_entry"])
+        b["last"] = stamp(b["last_entry"])
+    return data[-limit:]
+
+
+def jgrep(boot_id, pattern, since=None, until=None, kernel=False):
+    """journalctl lines matching pattern, as (when, who, message) tuples."""
+    cmd = ["journalctl", "-b", boot_id, "-o", "json", "-g", pattern, "--no-pager"]
+    if kernel:
+        cmd.append("-k")
+    if since:
+        cmd += ["--since", since.strftime("%Y-%m-%d %H:%M:%S")]
+    if until:
+        cmd += ["--until", until.strftime("%Y-%m-%d %H:%M:%S")]
+    rows = []
+    for line in run(cmd).splitlines():
+        try:
+            e = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        msg = e.get("MESSAGE")
+        if not isinstance(msg, str):
+            continue
+        who = e.get("SYSLOG_IDENTIFIER") or e.get("_COMM") or "?"
+        rows.append((stamp(e["__REALTIME_TIMESTAMP"]), who, msg))
+    return rows
+
+
+def clean_end(boot_id):
+    """True if the boot ended with a real shutdown instead of a hard reset."""
+    return bool(jgrep(boot_id, r"systemd-shutdown|Reached target (poweroff|reboot)"))
+
+
+def cycles_of(boot):
+    """Pair sleep entries with their exits."""
+    events = jgrep(boot["boot_id"], r"PM: (suspend|hibernation) (entry|exit)", kernel=True)
+    out, open_cycle = [], None
+    for when, _who, msg in events:
+        if "entry" in msg:
+            if open_cycle:
+                out.append(open_cycle)
+            kind = "hibernate" if "hibernation" in msg else "suspend"
+            mode = re.search(r"\(([^)]+)\)", msg)
+            open_cycle = {
+                "entry": when,
+                "kind": kind,
+                "mode": mode.group(1) if mode else kind,
+                "exit": None,
+            }
+        elif open_cycle:
+            open_cycle["exit"] = when
+            out.append(open_cycle)
+            open_cycle = None
+    if open_cycle:
+        out.append(open_cycle)
+    return out
+
+
+def classify(cycles, boot, is_current, ended_clean):
+    for i, c in enumerate(cycles):
+        last = i == len(cycles) - 1
+        # How long the machine stayed awake after this resume.
+        c["awake_until"] = boot["last"] if last else cycles[i + 1]["entry"]
+        if c["exit"] is None:
+            c["verdict"] = "running" if (last and is_current) else "no-resume"
+        elif last and not is_current and not ended_clean:
+            c["verdict"] = "hard-reset"
+        else:
+            c["verdict"] = "ok"
+    return cycles
+
+
+def evidence(boot_id, start, end):
+    """Labelled lines from the window after a resume."""
+    pattern = "|".join(f"({p})" for _label, p in MARKERS)
+    rows = []
+    # journalctl --until is truncated to the second, so the very last line of a
+    # boot falls outside the window without this nudge.
+    for when, who, msg in jgrep(boot_id, pattern, since=start, until=end + timedelta(seconds=1)):
+        if NOISE.search(msg) or NOISE.search(who):
+            continue
+        label = next((l for l, p in MARKERS if re.search(p, msg, re.I)), "other")
+        rows.append((when, label, who, msg.strip()))
+    return rows
+
+
+def summarise(rows):
+    """One line per interesting thing found in the window."""
+    notes = []
+    power = [r for r in rows if re.search(r"Power key pressed", r[3])]
+    if len(power) >= 2:
+        notes.append(f"{len(power)}x power key pressed with no poweroff after it: the "
+                     f"machine was awake and ignoring input")
+    gpu = [r for r in rows if r[1] == "gpu"]
+    if gpu:
+        notes.append(f"{len(gpu)} GPU or display error lines after the resume")
+    else:
+        notes.append("no GPU error after the resume: the driver thinks it came back fine, "
+                     "so look one level up at the session")
+    session = [r for r in rows if re.search(r"(New|Removed) session|greeter|X server", r[3])]
+    if session:
+        last = session[-1]
+        notes.append(f"last session event {last[0]:%H:%M:%S}: {last[3]}")
+        quiet = last[0] - rows[0][0]
+        notes.append(f"nothing from the desktop for the last "
+                     f"{human(rows[-1][0] - last[0])} of that window"
+                     if rows[-1][0] > last[0] else
+                     f"the session log stops {human(quiet)} after the resume")
+    return notes
+
+
+def report_boot(boot, args):
+    bid = boot["boot_id"]
+    is_current = boot["index"] == 0
+    ended_clean = True if is_current else clean_end(bid)
+    cycles = classify(cycles_of(boot), boot, is_current, ended_clean)
+
+    if is_current:
+        how = "still running"
+    elif ended_clean:
+        how = "clean shutdown"
+    else:
+        how = "HARD RESET, no shutdown logged"
+    bad = [c for c in cycles if c["verdict"] in ("no-resume", "hard-reset")]
+    print(f"boot {boot['index']:>3}  {bid[:8]}  "
+          f"{boot['first']:%Y-%m-%d %H:%M} to {boot['last']:%Y-%m-%d %H:%M}  {how}")
+    print(f"          {len(cycles)} sleep cycles, "
+          f"{len(cycles) - len(bad)} fine, {len(bad)} suspect")
+
+    for c in cycles:
+        quiet = c["verdict"] in ("ok", "running")
+        if quiet and not args.verbose:
+            continue
+        mark = " " if quiet else "!"
+        line = (f"  {mark} {c['entry']:%Y-%m-%d %H:%M:%S} {c['mode']:<10} "
+                f"slept {human((c['exit'] or boot['last']) - c['entry']):>7}")
+        if c["exit"]:
+            line += (f"  resumed {c['exit']:%H:%M:%S}, then awake "
+                     f"{human(c['awake_until'] - c['exit'])}")
+        else:
+            line += "  never logged an exit"
+        print(line)
+
+        if c["verdict"] == "no-resume":
+            print("      the kernel froze inside the sleep path: nothing was written after")
+            print("      that line, so the fault is in firmware or the s2idle path, not in X")
+        if c["verdict"] == "hard-reset" or (args.verbose and c["exit"]):
+            rows = evidence(bid, c["exit"], c["awake_until"])
+            for note in summarise(rows):
+                print(f"      {note}")
+            if args.verbose:
+                for when, label, who, msg in rows[:args.max_lines]:
+                    print(f"        {when:%H:%M:%S} [{label}] {who}: {msg[:140]}")
+
+    if args.tail and not ended_clean and not is_current:
+        print(f"      last {args.tail} lines before the machine went down:")
+        out = run(["journalctl", "-b", bid, "-o", "short-precise", "--no-pager"])
+        for line in [l for l in out.splitlines() if not NOISE.search(l)][-args.tail:]:
+            print(f"        {line[:160]}")
+    print()
+
+
+def config_report():
+    print("Static checks")
+    mem_sleep = read("/sys/power/mem_sleep")
+    print(f"  sleep modes        {mem_sleep or 'unknown'}")
+    if "deep" not in mem_sleep:
+        print("                     s2idle only: the display comes back through the GPU")
+        print("                     driver, not through firmware, so a driver bug shows up")
+        print("                     as a black screen on an otherwise healthy machine")
+
+    cmdline = read("/proc/cmdline")
+    gpu_params = " ".join(w for w in cmdline.split()
+                          if w.startswith(("amdgpu.", "i915.", "nvidia")))
+    print(f"  gpu boot params    {gpu_params or 'none'}")
+
+    swap_kb = 0
+    for line in read("/proc/swaps").splitlines()[1:]:
+        parts = line.split()
+        if len(parts) > 2:
+            swap_kb += int(parts[2])
+    mem_kb = 0
+    for line in read("/proc/meminfo").splitlines():
+        if line.startswith("MemTotal:"):
+            mem_kb = int(line.split()[1])
+
+    resume = ""
+    conf_d = Path("/etc/initramfs-tools/conf.d")
+    if conf_d.is_dir():
+        for f in sorted(conf_d.glob("*")):
+            m = re.search(r"RESUME=(\S+)", read(f))
+            if m:
+                resume = m.group(1)
+    m = re.search(r"\bresume=(\S+)", cmdline)
+    if m:
+        resume = m.group(1)
+    print(f"  hibernation image  swap {swap_kb // 1024}M vs RAM {mem_kb // 1024}M, "
+          f"resume target {resume or 'NOT SET'}")
+    if not resume:
+        print("                     with no resume target the machine boots fresh after a")
+        print("                     hibernate and drops the image, which looks exactly like")
+        print("                     a failed resume")
+    elif swap_kb < mem_kb:
+        print("                     swap is smaller than RAM: hibernation works only while")
+        print("                     the image fits, and fails late when it does not")
+
+    print(f"  persistent journal "
+          f"{'yes' if Path('/var/log/journal').is_dir() else 'NO, the logs die on reboot'}")
+    pstore = list(Path("/sys/fs/pstore").glob("*")) if Path("/sys/fs/pstore").is_dir() else []
+    print(f"  pstore crash dumps {len(pstore)} record(s)"
+          f"{'' if pstore else ' (nothing survived the last reset)'}")
+
+    print("  sleep inhibitors")
+    for line in run(["systemd-inhibit", "--list"]).splitlines()[1:]:
+        if line.strip() and not re.match(r"\d+ inhibitors? listed", line):
+            print(f"    {line[:150]}")
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("-n", "--boots", type=int, default=5,
+                    help="how many boots to walk (default 5)")
+    ap.add_argument("-v", "--verbose", action="store_true",
+                    help="evidence for every cycle, not just the bad ones")
+    ap.add_argument("--tail", type=int, default=0, metavar="N",
+                    help="also print the last N journal lines of each hard-reset boot")
+    ap.add_argument("--max-lines", type=int, default=25,
+                    help="evidence lines per cycle (default 25)")
+    ap.add_argument("--config", action="store_true", help="only the static checks")
+    args = ap.parse_args()
+
+    if args.config:
+        config_report()
+        return
+
+    bs = boots(args.boots)
+    print(f"Sleep cycles over the last {len(bs)} boot(s)\n")
+    for b in bs:
+        report_boot(b, args)
+    config_report()
+
+
+if __name__ == "__main__":
+    main()
