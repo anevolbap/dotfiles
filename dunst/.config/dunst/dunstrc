@@ -1,0 +1,47 @@
+# Dunst notification daemon.
+# Validated against dunst 1.9.0 (Debian 12). See `man dunstrc`.
+
+[global]
+    # Appearance
+    font = DejaVu Sans 10
+    width = 360
+    height = 120
+
+    # Position: top-right
+    origin = top-right
+    offset = 12x12
+
+    # Spacing
+    notification_limit = 5
+    gap_size = 8
+
+    # Borders
+    frame_width = 1
+    corner_radius = 8
+
+    # How long notifications stay around
+    timeout = 5
+
+    # Show on the monitor with the pointer
+    follow = mouse
+
+    # History
+    sticky_history = yes
+    history_length = 20
+
+    # Mouse
+    mouse_left_click = close_current
+    mouse_middle_click = close_all
+    mouse_right_click = context
+
+[urgency_low]
+    timeout = 3
+
+[urgency_normal]
+    timeout = 5
+
+[urgency_critical]
+    # Stays until dismissed.
+    timeout = 0
+    # frame_width is global-only in 1.9.0, so the border colour marks critical.
+    frame_color = "#d64e4e"

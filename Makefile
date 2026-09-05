@@ -4,7 +4,7 @@ DOTFILES_DIR := $(shell pwd)
 EMACS_TARGET  := $(HOME)/.emacs.d
 CRKBD_TARGET  := $(HOME)/qmk_firmware/keyboards/crkbd/keymaps/anevolbap
 
-.PHONY: emacs check delete crkbd local claude system help
+.PHONY: emacs check delete crkbd local claude dunst system help
 
 # Default target: show available targets
 help:
@@ -15,6 +15,7 @@ help:
 	@echo "  crkbd   — install Corne keyboard layout symlink"
 	@echo "  local   — install ~/.local/bin scripts (corne-rgb-alert)"
 	@echo "  claude  — install Claude Code settings (~/.claude/settings.json)"
+	@echo "  dunst   — install dunst config and notification autostart entries"
 	@echo "  system  — install systemd-sleep hooks (requires sudo)"
 
 # Install / re-create symlinks for Emacs config
@@ -41,6 +42,11 @@ local:
 # Claude Code global settings (~/.claude/settings.json)
 claude:
 	stow --verbose --dir=$(DOTFILES_DIR) --target=$(HOME) --restow claude
+
+# Dunst notification daemon: ~/.config/dunst and the autostart entries that
+# start dunst and keep xfce4-notifyd from starting.
+dunst:
+	stow --verbose --dir=$(DOTFILES_DIR) --target=$(HOME) --restow dunst
 
 # systemd-sleep hooks (system path needs sudo; stow doesn't fit here)
 system:
