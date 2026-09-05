@@ -36,5 +36,48 @@ without requiring them to be Emacs Lisp source files."
          (reading-time (/ num-words reading-speed-constant)))
     (message "Estimated reading time: %.2f minutes" reading-time)))
 
+;; Desktop notifications through D-Bus, rendered by dunst (see dunst/ in the
+;; dotfiles repo). dunst parses the text as Pango markup, so it has to be
+;; escaped. The requires are inside the function to keep dbus out of startup.
+
+(defun ao/notify (title body &optional urgency)
+  "Show a desktop notification with TITLE and BODY.
+URGENCY is `low', `normal' (the default) or `critical'."
+  (require 'notifications)
+  (require 'xml)
+  (notifications-notify :title (xml-escape-string title)
+                        :body (xml-escape-string body)
+                        :app-name "Emacs"
+                        :urgency (or urgency 'normal)))
+
+(defvar ao/notify-compilation-threshold 10
+  "Only notify about compilations that ran at least this many seconds.
+Keeps quick greps and recompiles from popping a notification.")
+
+(defvar ao/notify-compilation-start nil
+  "Start time of the running compilation.")
+
+(defun ao/notify-compilation-started (_proc)
+  "Remember when a compilation started."
+  (setq ao/notify-compilation-start (current-time)))
+
+(defun ao/notify-compilation-finished (buffer status)
+  "Notify that compilation in BUFFER ended with STATUS.
+Silent for runs shorter than `ao/notify-compilation-threshold'."
+  (let ((elapsed (and ao/notify-compilation-start
+                      (float-time (time-since ao/notify-compilation-start)))))
+    (setq ao/notify-compilation-start nil)
+    (when (and elapsed (>= elapsed ao/notify-compilation-threshold))
+      (let ((ok (string-prefix-p "finished" status)))
+        (ao/notify (if ok "Compilation finished" "Compilation failed")
+                   (format "%s in %ds: %s"
+                           (buffer-name buffer)
+                           (round elapsed)
+                           (string-trim status))
+                   (if ok 'normal 'critical))))))
+
+(add-hook 'compilation-start-hook #'ao/notify-compilation-started)
+(add-hook 'compilation-finish-functions #'ao/notify-compilation-finished)
+
 (provide 'utils)
 ;;; utils.el ends here
