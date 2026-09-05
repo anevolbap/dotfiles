@@ -141,3 +141,17 @@
 [transient-history-ignore]
     match_transient = yes
     history_ignore = yes
+
+# Emacs ships its icon only in hicolor, and dunst 1.9.0 stops at the first
+# hicolor theme it finds (flatpak's, which is empty), so name lookup fails.
+# Point at the file instead.
+[emacs-icon]
+    appname = Emacs
+    new_icon = /usr/share/icons/hicolor/scalable/apps/emacs.svg
+
+# Blink the Corne on critical notifications. Nothing happens when the keyboard
+# is not plugged in, the script just exits non-zero and dunst ignores that.
+# The path needs the ~, dunst's own PATH does not include ~/.local/bin.
+[corne-alert-critical]
+    msg_urgency = critical
+    script = ~/.local/bin/corne-rgb-alert
