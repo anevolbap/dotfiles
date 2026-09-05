@@ -1,47 +1,143 @@
 # Dunst notification daemon.
-# Validated against dunst 1.9.0 (Debian 12). See `man dunstrc`.
+# Validated against dunst 1.9.0 (Debian 12). Reference: /etc/xdg/dunst/dunstrc
+# and `man dunst`. Check this file with:
+#   dunst -conf ~/.config/dunst/dunstrc -verbosity warn
 
 [global]
-    # Appearance
-    font = DejaVu Sans 10
-    width = 360
-    height = 120
+    ### Where notifications appear ###
 
-    # Position: top-right
+    # Show on the monitor holding the pointer.
+    follow = mouse
     origin = top-right
     offset = 12x12
 
-    # Spacing
+    ### Size ###
+
+    width = 380
+    # Max height of one notification. Long bodies get scaled down to fit.
+    height = 160
+    # At most 5 on screen at once, the rest queue up.
     notification_limit = 5
+    # Space between notifications, instead of a separator line.
     gap_size = 8
+    separator_height = 0
+    padding = 12
+    horizontal_padding = 12
+    text_icon_padding = 8
 
-    # Borders
-    frame_width = 1
+    ### Frame ###
+
+    frame_width = 2
     corner_radius = 8
+    transparency = 0
 
-    # How long notifications stay around
-    timeout = 5
+    ### Text ###
 
-    # Show on the monitor with the pointer
-    follow = mouse
+    font = DejaVu Sans 10
+    line_height = 0
+    # Pango markup in the body: <b>, <i>, <u>, <a href>.
+    markup = full
+    format = "<b>%s</b>\n%b"
+    alignment = left
+    vertical_alignment = center
+    ellipsize = middle
+    ignore_newline = no
+    # Stamp notifications older than a minute with their age.
+    show_age_threshold = 60
 
-    # History
+    ### Icons ###
+
+    icon_position = left
+    min_icon_size = 24
+    max_icon_size = 48
+    # Look icons up by name in the icon theme. This replaces icon_path,
+    # which is ignored when recursive lookup is on.
+    enable_recursive_icon_lookup = true
+    icon_theme = "Adwaita, hicolor"
+
+    ### Progress bar (volume, brightness, anything sending a value hint) ###
+
+    progress_bar = true
+    progress_bar_height = 10
+    progress_bar_frame_width = 1
+    progress_bar_min_width = 150
+    progress_bar_max_width = 360
+
+    ### Behaviour ###
+
+    # Newest first, sorted by urgency.
+    sort = yes
+    # Collapse repeats into one notification with a counter.
+    stack_duplicates = true
+    hide_duplicate_count = false
+    # Show "(N more)" when the queue is longer than notification_limit.
+    indicate_hidden = yes
+    show_indicators = no
+    # Hold notifications instead of timing them out while the screen is idle
+    # for two minutes, so nothing is missed while away from the machine.
+    idle_threshold = 120
+    # Let the sender close its own notifications.
+    ignore_dbusclose = false
+
+    ### History ###
+
     sticky_history = yes
-    history_length = 20
+    history_length = 50
 
-    # Mouse
-    mouse_left_click = close_current
+    ### Mouse ###
+
+    # Left click runs the notification's default action if it has one,
+    # then closes it. Right click needs dmenu, see dunst/README.md.
+    mouse_left_click = do_action, close_current
     mouse_middle_click = close_all
     mouse_right_click = context
 
+    ### Helpers ###
+
+    # Opens URLs from notification bodies with the desktop default.
+    browser = /usr/bin/xdg-open
+    dmenu = /usr/bin/dmenu -p dunst:
+
+    ### Window identity, so a window manager can target dunst ###
+
+    title = Dunst
+    class = Dunst
+
 [urgency_low]
     timeout = 3
+    background = "#2e3440"
+    foreground = "#81a1c1"
+    frame_color = "#3b4252"
 
 [urgency_normal]
     timeout = 5
+    background = "#2e3440"
+    foreground = "#eceff4"
+    frame_color = "#4c566a"
 
 [urgency_critical]
     # Stays until dismissed.
     timeout = 0
-    # frame_width is global-only in 1.9.0, so the border colour marks critical.
-    frame_color = "#d64e4e"
+    background = "#3b2b2e"
+    foreground = "#eceff4"
+    # frame_width is global-only in 1.9.0, so colour marks critical instead.
+    frame_color = "#bf616a"
+
+### Rules. Every section below is a filter plus the settings it overrides.
+### Later rules win over earlier ones.
+
+# Do not cover a fullscreen window, and re-delay anything already on screen
+# when a window goes fullscreen.
+[fullscreen-pushback]
+    summary = "*"
+    fullscreen = pushback
+
+# Critical notifications are the exception, they show anyway.
+[fullscreen-show-critical]
+    msg_urgency = critical
+    fullscreen = show
+
+# Transient notifications (volume and brightness popups) are noise in history.
+[transient-history-ignore]
+    match_transient = yes
+    history_ignore = yes
