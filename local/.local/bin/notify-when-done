@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#
+# notify-when-done — run a command and send a desktop notification when it ends.
+#
+# Normal urgency when the command succeeds, critical when it fails, so a failed
+# run stays on screen until dismissed. The command's own exit status is passed
+# through, so this composes: notify-when-done make && ./deploy
+#
+# Usage:
+#     notify-when-done pytest
+#     notify-when-done make -j8
+#     notify-when-done sleep 60
+
+set -u
+
+if [ "$#" -eq 0 ]; then
+    echo "usage: notify-when-done <command> [args...]" >&2
+    exit 2
+fi
+
+# dunst renders notifications as Pango markup, so the command line has to be
+# escaped or a shell redirect turns into a broken tag.
+escape() {
+    printf '%s' "$*" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
+}
+
+command_line=$(escape "$@")
+start=$SECONDS
+
+"$@"
+status=$?
+
+elapsed=$((SECONDS - start))
+
+if [ "$status" -eq 0 ]; then
+    notify-send -u normal "Command finished" "${command_line} (${elapsed}s)"
+else
+    notify-send -u critical "Command failed (exit ${status})" \
+        "${command_line} (${elapsed}s)"
+fi
+
+exit "$status"
