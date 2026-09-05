@@ -1,0 +1,7 @@
+# Shadows /etc/xdg/autostart/xfce4-notifyd.desktop so the XFCE notification
+# daemon does not autostart. Dunst owns org.freedesktop.Notifications instead.
+[Desktop Entry]
+Type=Application
+Name=Xfce Notification Daemon
+Exec=/usr/lib/x86_64-linux-gnu/xfce4/notifyd/xfce4-notifyd
+Hidden=true
