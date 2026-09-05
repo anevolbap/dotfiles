@@ -71,6 +71,51 @@ dunstctl is-paused
 Repeats collapse: send the same summary and body three times and
 `dunstctl count` should show one notification with a counter, not three.
 
+## Emacs and shell integration
+
+Emacs talks to dunst through the built-in `notifications.el`, no package
+needed. `emacs/utils.el` wraps it:
+
+```elisp
+(ao/notify "Title" "Body" 'critical)   ; urgency defaults to 'normal
+```
+
+The body is escaped, because `markup = full` means dunst parses it as Pango
+markup and a raw `<` would break the notification.
+
+`compilation-finish-functions` uses that helper, so `M-x compile` and
+`recompile` notify when they end: normal urgency on success, critical on
+failure, with the elapsed time in the body. Runs shorter than
+`ao/notify-compilation-threshold` (10 seconds) stay silent, which keeps
+`M-x grep` from popping a notification every time.
+
+Org needs nothing: `org-show-notification` in `org-clock.el` already calls
+`notifications-notify`, so `org-timer-set-timer` and clock reminders go
+through dunst as they are.
+
+Outside Emacs, `local/.local/bin/notify-when-done` (installed by `make local`)
+runs a command and notifies when it ends, passing the exit status through:
+
+```sh
+notify-when-done pytest
+notify-when-done make -j8
+```
+
+## Two rules worth knowing
+
+`[emacs-icon]` sets the icon for anything with appname `Emacs`. Emacs ships
+its icon only in `hicolor`, and dunst 1.9.0 stops at the first `hicolor`
+theme it finds, which here is flatpak's empty one at
+`/var/lib/flatpak/exports/share/icons/hicolor`. So `/usr/share/icons/hicolor`
+is never searched and lookup by name fails. The rule points at the file
+instead. Any other app whose icon lives only in hicolor needs the same
+treatment. Adwaita names such as `dialog-information` are unaffected.
+
+`[corne-alert-critical]` runs `~/.local/bin/corne-rgb-alert` on critical
+notifications, so a failed test run blinks the keyboard. dunst expands the
+`~` and passes five arguments the script ignores. Nothing happens when the
+Corne is not plugged in.
+
 ## Keyboard shortcuts
 
 Dunst 1.9 has no built-in keybindings. Bind these through the window manager
