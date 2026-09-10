@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""
+claude-token-report — where Claude Code tokens go, read from the transcripts
+in ~/.claude/projects.
+
+Context is re-read on every turn, so cost tracks context size times turn
+count, not the volume of material read. This prints both, plus what a smaller
+context window would have saved.
+
+    claude-token-report            # summary
+    claude-token-report --top 20   # more sessions
+
+Transcripts are pruned after cleanupPeriodDays (default 30), so the window is
+about a month unless that setting was raised.
+"""
+import argparse
+import collections
+import json
+import os
+from pathlib import Path
+
+BASE = Path(os.path.expanduser("~/.claude/projects"))
+
+
+def text_size(body):
+    """Chars of text in a tool result. Image blocks are base64 blobs in the
+    transcript but cost far less as tokens, so they are not counted."""
+    if isinstance(body, str):
+        return len(body)
+    if not isinstance(body, list):
+        return len(json.dumps(body))
+    return sum(len(json.dumps(b)) for b in body
+               if isinstance(b, dict) and b.get("type") != "image")
+
+
+def kind_of(rel):
+    if len(rel) == 2:
+        return "main"
+    return "workflow" if "workflows" in rel else "subagent"
+
+
+def scan():
+    kinds = collections.Counter()
+    sessions = collections.defaultdict(lambda: {"ctx": [], "out": 0, "proj": "", "start": ""})
+    tools = collections.Counter()
+    material = collections.Counter()
+    pending = {}
+
+    for path in BASE.rglob("*.jsonl"):
+        rel = path.relative_to(BASE).parts
+        kind = kind_of(rel)
+        sid = rel[1] if len(rel) > 2 else rel[1][:-6]
+        sess = sessions[sid]
+        sess["proj"] = rel[0]
+        for line in path.open(encoding="utf-8", errors="replace"):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue
+            msg = entry.get("message") or {}
+            if entry.get("type") == "assistant":
+                usage = msg.get("usage") or {}
+                ctx = (usage.get("cache_read_input_tokens", 0) or 0) + (
+                    usage.get("cache_creation_input_tokens", 0) or 0)
+                out = usage.get("output_tokens", 0) or 0
+                kinds[kind] += ctx + out
+                if kind == "main":
+                    sess["ctx"].append(ctx)
+                    sess["out"] += out
+                    ts = entry.get("timestamp") or ""
+                    if ts and (not sess["start"] or ts < sess["start"]):
+                        sess["start"] = ts
+                for block in msg.get("content") or []:
+                    if isinstance(block, dict) and block.get("type") == "tool_use":
+                        tools[block.get("name", "?")] += 1
+                        pending[block.get("id")] = block.get("name", "?")
+            elif entry.get("type") == "user" and isinstance(msg.get("content"), list):
+                for block in msg["content"]:
+                    if isinstance(block, dict) and block.get("type") == "tool_result":
+                        name = pending.get(block.get("tool_use_id"), "?")
+                        material[name] += text_size(block.get("content"))
+    return kinds, sessions, tools, material
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--top", type=int, default=10, help="sessions to list")
+    args = ap.parse_args()
+
+    if not BASE.is_dir():
+        raise SystemExit(f"no transcripts at {BASE}")
+    kinds, sessions, tools, material = scan()
+    live = {s: v for s, v in sessions.items() if v["ctx"]}
+    if not live:
+        raise SystemExit("no assistant turns found")
+
+    mega = lambda n: f"{n / 1e6:.1f}M"
+    total = sum(kinds.values())
+    print(f"total billed-ish tokens: {mega(total)} over {len(live)} sessions\n")
+
+    print("by transcript kind")
+    for name, value in kinds.most_common():
+        print(f"  {name:9} {mega(value):>9}  {100 * value / total:5.1f}%")
+
+    unique = sum(material.values()) / 4
+    print(f"\nunique material that entered a context: {mega(unique)} tokens")
+    print(f"amplification: {total / max(unique, 1):.0f}x  (each token re-read this many times)")
+
+    print(f"\ntop {args.top} sessions")
+    ranked = sorted(live.items(), key=lambda kv: -(sum(kv[1]["ctx"]) + kv[1]["out"]))
+    for sid, s in ranked[:args.top]:
+        ctx = s["ctx"]
+        cost = sum(ctx) + s["out"]
+        median = sorted(ctx)[len(ctx) // 2]
+        print(f"  {mega(cost):>8} {100 * cost / total:5.1f}%  turns={len(ctx):5}"
+              f"  median_ctx={mega(median):>7}  {s['start'][:10]}  {s['proj'][-38:]}")
+
+    ctx_all = [c for s in live.values() for c in s["ctx"]]
+    actual = sum(ctx_all)
+    print("\nwhat a smaller context window would have saved")
+    for cap in (100, 150, 200, 300, 500):
+        capped = sum(min(c, cap * 1000) for c in ctx_all)
+        print(f"  cap {cap:>4}k: {mega(capped):>9}  saves {100 * (1 - capped / actual):5.1f}%")
+
+    print("\nnoisiest tool output (chars)")
+    for name, value in material.most_common(6):
+        print(f"  {name:12} {value / 1e6:7.1f}M  ({tools[name]} calls)")
+
+
+if __name__ == "__main__":
+    main()
