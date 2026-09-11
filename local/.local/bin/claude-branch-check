@@ -6,6 +6,10 @@ branch (main, master, develop, gallery), exits 2 to block the tool call and
 surfaces the reason to the model. Otherwise exits 0 and prints the current
 branch so the model knows where it is committing.
 
+It also blocks commands that stage everything (git add -A, --all, -u, . and
+git commit -a): several sessions often share one checkout, so these would
+sweep in another session's changes.
+
 The branch is read from the repository the commit actually runs in, which is
 not always the session's cwd: a command may target another repository with
 `git -C <path>` or with a `cd <path> &&` prefix.
@@ -30,6 +34,17 @@ CD_RE = re.compile(r"(?:^|&&|\|\||;)\s*cd\s+(?P<dir>'[^']*'|\"[^\"]*\"|\S+)")
 
 # Plumbing that is not a commit to a branch.
 PLUMBING_RE = re.compile(r"\bgit\s+commit-(tree|graph)\b")
+
+# Commands that stage everything in the checkout.
+SWEEP_RE = re.compile(
+    r"\bgit\s+(?:-[Cc]\s+\S+\s+)*"
+    r"(?:add\b[^;&|\n]*?\s(?:-A|--all|-u|--update|\.)(?=\s|$|[;&|])"
+    r"|commit\b[^;&|\n]*?\s(?:--all\b|-[A-Za-z]*a[A-Za-z]*\b))"
+)
+
+# Quoted strings, removed before the sweep check so a commit message that
+# mentions `git add -A` does not count.
+QUOTED_RE = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
 
 
 def _resolve(value: str, base: str) -> str:
@@ -70,6 +85,12 @@ def main() -> int:
         return 0
 
     cmd = data.get("tool_input", {}).get("command", "")
+    if SWEEP_RE.search(QUOTED_RE.sub("''", cmd)):
+        sys.stderr.write(
+            "Refusing to stage everything (git add -A, --all, -u, . or git commit -a). "
+            "Other sessions may have changes in this checkout. Stage explicit paths.\n"
+        )
+        return 2
     if not COMMIT_RE.search(cmd):
         return 0
     if PLUMBING_RE.search(cmd):
