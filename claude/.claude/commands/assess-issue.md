@@ -17,5 +17,5 @@ Steps:
    - Approach: minimal fix, or the alternatives if more than one. Weigh them honestly, do not undersell options.
    - Risks: what could break.
    - Effort: trivial / small / medium / large per the planning bucket in `~/CLAUDE.md`.
-8. Stop. Do not start implementation until I confirm. If you draft a comment for the issue, follow the communication rules in `~/CLAUDE.md`: terse, question-oriented, no preamble, no mention of unrelated PRs, draft-first for my approval.
+8. Stop. Do not start implementation until I confirm. If you draft a comment for the issue, follow the communication rules in `~/.claude/oss-contributions.md`: terse, question-oriented, no preamble, no mention of unrelated PRs, draft-first for my approval.
 9. After I confirm, add a tracker entry to `~/Documents/org/projects.org` under the right project heading. Use the heading format `** TODO [[<issue_url>][Issue #N]] - <title> :tags:` (state changes to ONGOING once a branch or comment exists). Body paragraphs unwrapped, one paragraph per line. See `~/CLAUDE.md` for the full file conventions.
