@@ -4,7 +4,7 @@ DOTFILES_DIR := $(shell pwd)
 EMACS_TARGET  := $(HOME)/.emacs.d
 CRKBD_TARGET  := $(HOME)/qmk_firmware/keyboards/crkbd/keymaps/anevolbap
 
-.PHONY: emacs check delete crkbd local claude dunst system help
+.PHONY: emacs check delete crkbd local claude dunst sway system help
 
 # Default target: show available targets
 help:
@@ -16,6 +16,7 @@ help:
 	@echo "  local   — install ~/.local/bin scripts (corne-rgb-alert)"
 	@echo "  claude  — install Claude Code settings (~/.claude/settings.json)"
 	@echo "  dunst   — install dunst config and notification autostart entries"
+	@echo "  sway    — install sway config (~/.config/sway/config)"
 	@echo "  system  — install systemd-sleep hooks (requires sudo)"
 
 # Install / re-create symlinks for Emacs config
@@ -47,6 +48,10 @@ claude:
 # start dunst and keep xfce4-notifyd from starting.
 dunst:
 	stow --verbose --dir=$(DOTFILES_DIR) --target=$(HOME) --restow dunst
+
+# Sway window manager, run as a second session next to XFCE.
+sway:
+	stow --verbose --dir=$(DOTFILES_DIR) --target=$(HOME) --restow sway
 
 # systemd-sleep hooks (system path needs sudo; stow doesn't fit here)
 system:
