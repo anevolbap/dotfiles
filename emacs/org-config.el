@@ -190,6 +190,41 @@
         (end-of-line)))))
 
 ;; ============================================================================
+;; Close structure blocks completed from "#+begin_"
+;;
+;; Org's pcomplete offers the opening line only, so completing "#+begin_src"
+;; leaves the block unterminated. Add the matching "#+end_" line. Point stays
+;; on the begin line when the completion left a trailing space (src and export
+;; take an argument), otherwise it moves into the empty body.
+;; ============================================================================
+
+(defun ao/org-close-structure-block (&rest _)
+  "Terminate a bare \"#+begin_\" line at point with its \"#+end_\" line."
+  (when (and (derived-mode-p 'org-mode) (not buffer-read-only) (eolp))
+    (let ((case-fold-search t) indent name argp)
+      (when (save-excursion
+              (beginning-of-line)
+              (when (looking-at "\\([ \t]*\\)#\\+begin_\\([a-zA-Z]+\\)\\([ \t]*\\)$")
+                (setq indent (match-string 1)
+                      name (downcase (match-string 2))
+                      argp (not (string-empty-p (match-string 3))))
+                t))
+        ;; An unterminated block parses as a paragraph, a closed one as a
+        ;; block element. Checking this clobbers the match data, hence the
+        ;; captures above.
+        (when (eq 'paragraph (org-element-type (org-element-at-point)))
+          (save-excursion
+            (end-of-line)
+            (insert "\n" indent "\n" indent "#+end_" name))
+          ;; With an argument to type, stay put. Otherwise go to the body.
+          (unless argp
+            (forward-line 1)
+            (end-of-line)))))))
+
+(dolist (cmd '(completion-at-point completion-preview-insert choose-completion))
+  (advice-add cmd :after #'ao/org-close-structure-block))
+
+;; ============================================================================
 ;; Claude Code sessions in the agenda
 ;;
 ;; Sessions live in claude-sessions.org, written by M-x claude-sessions-org-sync.
