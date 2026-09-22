@@ -1,5 +1,5 @@
 # Emacs backup and lock files
-*.*~
+*~
 \#*\#
 .#*
 
@@ -29,3 +29,9 @@ emacs/.DS_Store
 # Claude Code project notes and per-machine settings
 /CLAUDE.md
 claude/.claude/settings.json
+
+# Local Claude Code state and worktrees
+/.claude/
+
+# Python bytecode
+__pycache__/
