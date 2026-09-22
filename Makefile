@@ -4,7 +4,7 @@ DOTFILES_DIR := $(shell pwd)
 EMACS_TARGET  := $(HOME)/.emacs.d
 CRKBD_TARGET  := $(HOME)/qmk_firmware/keyboards/crkbd/keymaps/anevolbap
 
-.PHONY: emacs check delete crkbd local claude dunst sway system help
+.PHONY: emacs check delete crkbd local claude dunst sway system test help
 
 # Default target: show available targets
 help:
@@ -18,6 +18,7 @@ help:
 	@echo "  dunst   — install dunst config and notification autostart entries"
 	@echo "  sway    — install sway config (~/.config/sway/config)"
 	@echo "  system  — install systemd-sleep hooks (requires sudo)"
+	@echo "  test    — run the script tests (pytest)"
 
 # Install / re-create symlinks for Emacs config
 emacs:
@@ -57,3 +58,7 @@ sway:
 system:
 	sudo ln -sf $(DOTFILES_DIR)/system/systemd-sleep/restart-wifi \
 		/lib/systemd/system-sleep/restart-wifi
+
+# Tests for the scripts in local/.local/bin
+test:
+	python3 -m pytest tests -q
