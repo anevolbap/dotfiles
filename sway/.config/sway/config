@@ -221,11 +221,14 @@ bindsym $mod+r mode "resize"
 # Read `man 5 sway-bar` for more information about this section.
 bar {
     position top
+    # Waybar replaces swaybar; its config is in ~/.config/waybar.
+    swaybar_command waybar
 
     # When the status_command prints a new line to stdout, swaybar updates.
     # The default just shows the current date and time.
     # status_command while date +'%Y-%m-%d %X'; do sleep 1; done
-    status_command ~/.config/sway/status.sh
+    # DEPRECATED: replaced by waybar, delete after waybar is confirmed.
+    # status_command ~/.config/sway/status.sh
 
     colors {
         statusline #ffffff
@@ -250,6 +253,7 @@ input type:touchpad {
 # Sway does not run ~/.config/autostart, so start the session helpers here.
 exec dunst
 exec nm-applet --indicator
+exec blueman-applet
 exec /usr/libexec/polkit-mate-authentication-agent-1
 
 # Lock after 10 minutes, screen off after 15, and lock before suspend.

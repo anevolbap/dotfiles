@@ -1,0 +1,24 @@
+{
+    "position": "top",
+    "modules-left": ["sway/workspaces", "sway/mode"],
+    "modules-right": ["bluetooth", "battery", "clock", "tray"],
+
+    "battery": {
+        "states": { "warning": 30, "critical": 15 },
+        "format": "{icon} {capacity}%",
+        "format-charging": " {capacity}%",
+        "format-icons": ["", "", "", "", ""]
+    },
+    "bluetooth": {
+        "format": " {status}",
+        "format-connected": " {device_alias}",
+        "format-disabled": " off",
+        "on-click": "blueman-manager"
+    },
+    "clock": {
+        "format": "{:%Y-%m-%d %H:%M}"
+    },
+    "tray": {
+        "spacing": 8
+    }
+}
