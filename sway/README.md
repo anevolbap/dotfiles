@@ -4,8 +4,8 @@ Sway session, installed next to XFCE. LightDM lists both; pick one at login.
 
 ## Contents
 
-| Path | Purpose |
-| --- | --- |
+| Path                  | Purpose                                                                            |
+|-----------------------|------------------------------------------------------------------------------------|
 | `.config/sway/config` | Copy of `/etc/sway/config` (sway 1.10.1-2) with a "Local changes" block at the end |
 
 The local block sets the `us` keyboard (`altgr-intl` variant, `Alt+Shift`
@@ -33,8 +33,8 @@ sway --validate
 
 ## Keys added on top of the stock config
 
-| Key | Action |
-| --- | --- |
-| `Super+Escape` | lock the screen |
-| `Shift+Print` | screenshot a region to the clipboard |
-| media keys | play/pause, next, previous (playerctl) |
+| Key            | Action                                 |
+|----------------|----------------------------------------|
+| `Super+Escape` | lock the screen                        |
+| `Shift+Print`  | screenshot a region to the clipboard   |
+| media keys     | play/pause, next, previous (playerctl) |
