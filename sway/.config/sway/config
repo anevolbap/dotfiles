@@ -224,12 +224,6 @@ bar {
     # Waybar replaces swaybar; its config is in ~/.config/waybar.
     swaybar_command waybar
 
-    # When the status_command prints a new line to stdout, swaybar updates.
-    # The default just shows the current date and time.
-    # status_command while date +'%Y-%m-%d %X'; do sleep 1; done
-    # DEPRECATED: replaced by waybar, delete after waybar is confirmed.
-    # status_command ~/.config/sway/status.sh
-
     colors {
         statusline #ffffff
         background #323232
