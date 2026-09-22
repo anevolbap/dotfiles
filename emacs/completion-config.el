@@ -168,6 +168,42 @@ back."
 (use-package embark-consult
   :after (embark consult))
 
+;; ------------------------------------------------------------
+;; 7. In-buffer completion preview (built-in, Emacs 30+)
+;; ------------------------------------------------------------
+;; Shows the most likely completion as inline grey text after point.
+;; No popup, so it does not hit the GTK cast assertion that made corfu
+;; unusable on this build (see the DEPRECATED block in eglot-config.el).
+;; Candidates come from `completion-at-point-functions', so eglot and
+;; cape feed it in the buffers where they are active.
+(use-package completion-preview
+  :ensure nil
+  :demand t
+  :custom
+  ;; Preview after 2 characters instead of 3.
+  (completion-preview-minimum-symbol-length 2)
+  ;; The preview matches on prefix only. `completion-styles' stays as
+  ;; configured above for TAB and the minibuffer.
+  (completion-preview-completion-styles '(basic))
+  :hook ((prog-mode org-mode) . completion-preview-mode)
+  :config
+  ;; The preview only updates after a command in `completion-preview-commands',
+  ;; which lists `self-insert-command'. Org remaps typing and deletion to its
+  ;; own commands, so without these the preview never appears in org buffers.
+  (dolist (cmd '(org-self-insert-command
+                 org-delete-backward-char
+                 org-delete-char))
+    (add-to-list 'completion-preview-commands cmd))
+  :bind
+  (:map completion-preview-active-mode-map
+        ;; TAB keeps its usual meaning (indent, then show *Completions*)
+        ;; rather than accepting the preview, which is on M-RET.
+        ("TAB" . completion-preview-complete)
+        ("M-RET" . completion-preview-insert)
+        ("M-i" . completion-preview-insert-word)
+        ("M-n" . completion-preview-next-candidate)
+        ("M-p" . completion-preview-prev-candidate)))
+
 ;; Richer annotations in the *Completions* buffer
 (setq completions-detailed t)
 
