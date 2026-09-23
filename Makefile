@@ -52,7 +52,7 @@ dunst:
 
 # Sway window manager, run as a second session next to XFCE.
 sway:
-	stow --verbose --dir=$(DOTFILES_DIR) --target=$(HOME) --restow sway
+	stow --verbose --no-folding --dir=$(DOTFILES_DIR) --target=$(HOME) --restow sway
 
 # systemd-sleep hooks (system path needs sudo; stow doesn't fit here)
 system:

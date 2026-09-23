@@ -234,11 +234,8 @@ bar {
 #
 # Local changes:
 #
-input type:keyboard {
-    xkb_layout us
-    xkb_variant altgr-intl,
-    xkb_options grp:alt_shift_toggle
-}
+# Per-machine settings (keyboard layout, outputs) live outside this repo.
+include ~/.config/sway/config.d/*
 
 input type:touchpad {
     tap enabled
