@@ -29,7 +29,7 @@ import sys
 import time
 import uuid
 
-ROAM_DIR = os.path.expanduser("~/org/roam-notes")
+ROAM_DIR = os.path.expanduser(os.environ.get("ROAM_DIR", "~/org/roam-notes"))
 
 
 def slugify(title):

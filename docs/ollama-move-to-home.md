@@ -39,7 +39,7 @@ sudo ln -s $HOME/ollama/lib /usr/local/lib/ollama
 sudo mkdir -p /etc/systemd/system/ollama.service.d
 sudo tee /etc/systemd/system/ollama.service.d/override.conf <<'EOF'
 [Service]
-Environment="OLLAMA_MODELS=$HOME/ollama/models"
+Environment="OLLAMA_MODELS=/home/<user>/ollama/models"
 EOF
 
 # 5. Reload and restart
