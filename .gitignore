@@ -35,3 +35,8 @@ claude/.claude/settings.json
 
 # Python bytecode
 __pycache__/
+
+# Personal overrides, kept out of the public repo (see README)
+emacs/local.el
+emacs/rss-feeds
+emacs/radios

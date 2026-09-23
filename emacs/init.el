@@ -55,6 +55,10 @@
 (when (file-exists-p custom-file)
   (load custom-file))
 
+;; Personal overrides (org directory, feeds, world clock, extra packages).
+;; Not in this repo; loaded before the modules so their defvars pick it up.
+(load (concat user-emacs-directory "local.el") t)
+
 ;; Load my config files
 (load (concat user-emacs-directory "utils.el"))
 (load (concat user-emacs-directory "eglot-config.el"))

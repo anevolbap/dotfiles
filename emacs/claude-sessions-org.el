@@ -43,7 +43,7 @@
   :group 'claude-sessions)
 
 (defcustom claude-sessions-org-file
-  (expand-file-name "~/org/claude-sessions.org")
+  (expand-file-name "claude-sessions.org" my-org-directory)
   "Org file written by `claude-sessions-org-sync'.
 Regenerated in full on every run."
   :type 'file

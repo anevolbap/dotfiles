@@ -1,5 +1,4 @@
 #+title: GNU Emacs configuration
-#+author: anevolbap
 #+date: <2026-08-11 Tue>
 #+language: en
 #+seq_todo: TODO REVIEW FIX DONE
@@ -316,8 +315,9 @@ Review periodically; remove or replace when MELPA alternatives appear.
 ** World clock
 #+begin_src emacs-lisp
   ;; Displaying World Time
-  (setq world-clock-list
-        '(("Etc/UTC"                          "UTC")))
+  (defvar my-world-clock-list '(("Etc/UTC" "UTC"))
+    "Zones for `world-clock' and the dashboard. Set in local.el.")
+  (setq world-clock-list my-world-clock-list)
   (setq world-clock-time-format "%a, %d %b %I:%M %p %Z")
 #+end_src
 
@@ -1052,7 +1052,9 @@ Ediff
   (use-package elfeed
     :bind ("C-x w" . elfeed)
     :config
-    (setq elfeed-feeds (ao/read-from-file (expand-file-name "rss-feeds" user-emacs-directory))))
+    (let ((feeds (expand-file-name "rss-feeds" user-emacs-directory)))
+      (when (file-exists-p feeds)
+        (setq elfeed-feeds (ao/read-from-file feeds)))))
 #+end_src
 
 ** Radio
@@ -1063,7 +1065,9 @@ Ediff
            ("C-c r s" . eradio-stop))
     :config
     (setq eradio-player '("mpv" "--no-video"))
-    (setq eradio-channels (ao/read-from-file (expand-file-name "radios" user-emacs-directory))))
+    (let ((radios (expand-file-name "radios" user-emacs-directory)))
+      (when (file-exists-p radios)
+        (setq eradio-channels (ao/read-from-file radios)))))
 #+end_src
 
 #+begin_src emacs-lisp

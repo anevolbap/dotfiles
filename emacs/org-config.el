@@ -5,15 +5,24 @@
 ;;;
 ;;; Code:
 
-(defconst my-org-directory (expand-file-name "~/org")
+;; The defvars below are the personal knobs. Set them in local.el (loaded
+;; before this file, see init.el) to override the defaults.
+
+(defvar my-org-directory (expand-file-name "~/org")
   "Main directory for org files.")
 
-(defconst my-org-notes-file (expand-file-name "notes.org" my-org-directory)
+(defvar my-org-notes-file (expand-file-name "notes.org" my-org-directory)
   "Default file for org notes.")
 
-(defconst my-org-capture-templates-file
+(defvar my-org-capture-templates-file
   (expand-file-name "capture-templates" user-emacs-directory)
   "File containing org capture templates.")
+
+(defvar my-org-read-tag "read"
+  "Tag for the reading list, used by link triage and agenda commands.")
+
+(defvar my-org-todo-keyword-faces nil
+  "Extra `org-todo-keyword-faces' entries, for keywords set per file.")
 
 (use-package org
   :ensure nil
@@ -47,10 +56,9 @@
   (org-todo-keywords
    '((sequence "TODO(t)" "IN-PROGRESS(i)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)")))
 
-  ;; Per-keyword colors. Inherit theme faces instead of hardcoding hex, so the
-  ;; palette follows the theme (light/dark).
-  (org-todo-keyword-faces
-   '(("EXPIRED"   . (:inherit shadow))))                ; dead/neutral
+  ;; Per-keyword colors for keywords defined in #+SEQ_TODO lines. Inherit
+  ;; theme faces instead of hardcoding hex, so the palette follows the theme.
+  (org-todo-keyword-faces my-org-todo-keyword-faces)
 
   ;; Refile across all agenda files, up to 3 levels deep.
   ;; Not `org-agenda-files' directly: claude-sessions.org is generated and lives
@@ -101,19 +109,19 @@
 
   ;; Custom agenda commands
   (org-agenda-custom-commands
-   '(("d" "Dashboard"
+   `(("d" "Dashboard"
       ((ao/dashboard-upcoming-block)
-       (tags-todo "+read"
+       (tags-todo ,(concat "+" my-org-read-tag)
                   ((org-agenda-overriding-header "Reading list (top 5)")
                    (org-agenda-sorting-strategy '(todo-state-up priority-down))
                    (org-agenda-max-entries 5)))
-       (tags-todo "-read"
+       (tags-todo ,(concat "-" my-org-read-tag)
                   ((org-agenda-overriding-header "Active TODOs (top 5 by latest update)")
                    (org-agenda-sorting-strategy '(tsia-down))
                    (org-agenda-skip-function
                     '(org-agenda-skip-entry-if 'regexp "^[ \t]*:STYLE:[ \t]+habit"))
                    (org-agenda-max-entries 5)))))
-     ("l" "Reading list" tags-todo "read")
+     ("l" "Reading list" tags-todo ,my-org-read-tag)
      ;; Habits (STYLE: habit in habits.org). Only today's line is shown, with
      ;; the consistency graph; `org-habit-graph-column' sets where it starts.
      ("h" "Habits"
@@ -336,8 +344,8 @@ Returns +1, -1 or nil as `org-agenda-cmp-user-defined' requires."
 ;; `ao/org-triage-links' (by hand, or via the timer below) classifies each
 ;; untagged link TODO in tasks.org by regex on its URL: arxiv -> paper
 ;; (title/author/venue/year fetched from the arXiv API, filed into
-;; papers.org), youtube/vimeo -> video, anything else -> read. Video and read
-;; entries are just tagged in place.
+;; papers.org), youtube/vimeo -> video, anything else -> `my-org-read-tag'.
+;; Video and reading-list entries are just tagged in place.
 ;; ============================================================================
 
 (require 'xml)
@@ -431,16 +439,16 @@ Called in a loop, the kill then accumulates every subtree cut so far and
         (save-buffer)))))
 
 (defun ao/classify-link-url (url)
-  "Classify URL as `paper', `video' or `read' by pattern match."
+  "Return the tag for URL: \"paper\", \"video\" or `my-org-read-tag'."
   (cond
-   ((string-match-p "arxiv\\.org/" url) 'paper)
-   ((string-match-p "\\(?:youtube\\.com\\|youtu\\.be\\|vimeo\\.com\\)/" url) 'video)
-   (t 'read)))
+   ((string-match-p "arxiv\\.org/" url) "paper")
+   ((string-match-p "\\(?:youtube\\.com\\|youtu\\.be\\|vimeo\\.com\\)/" url) "video")
+   (t my-org-read-tag)))
 
 (defun ao/org-triage-links ()
   "Classify untagged link TODOs in tasks.org and tag or file them.
 Papers get arxiv metadata filled in and are moved into papers.org; video and
-read entries are just tagged in place. Logs rather than stops on an entry
+reading-list entries are just tagged in place. Logs rather than stops on an entry
 that fails."
   (interactive)
   (let* ((tasks-file (expand-file-name "tasks.org" my-org-directory))
@@ -462,9 +470,9 @@ that fails."
             (with-current-buffer (marker-buffer marker)
               (goto-char marker)
               (let* ((url (org-entry-get nil "URL"))
-                     (type (ao/classify-link-url url)))
-                (org-set-tags (list (symbol-name type)))
-                (when (eq type 'paper)
+                     (tag (ao/classify-link-url url)))
+                (org-set-tags (list tag))
+                (when (equal tag "paper")
                   (ao/org-triage-paper-entry marker papers-file))))
             (cl-incf done))
         (error (cl-incf failed)

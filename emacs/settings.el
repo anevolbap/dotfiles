@@ -231,8 +231,9 @@
 (global-set-key (kbd "C-c t") 'type-break)
 
 ;; Displaying World Time
-(setq world-clock-list
-      '(("Etc/UTC"                          "UTC")))
+(defvar my-world-clock-list '(("Etc/UTC" "UTC"))
+  "Zones for `world-clock' and the dashboard. Set in local.el.")
+(setq world-clock-list my-world-clock-list)
 (setq world-clock-time-format "%a, %d %b %I:%M %p %Z")
 
 (global-set-key (kbd "C-c s") #'dashboard-show)
@@ -832,7 +833,9 @@ where `syntax-ppss' does not reliably identify node types."
 (use-package elfeed
   :bind ("C-x w" . elfeed)
   :config
-  (setq elfeed-feeds (ao/read-from-file (expand-file-name "rss-feeds" user-emacs-directory))))
+  (let ((feeds (expand-file-name "rss-feeds" user-emacs-directory)))
+    (when (file-exists-p feeds)
+      (setq elfeed-feeds (ao/read-from-file feeds)))))
 
 ;; eradio — simple internet radio player (MELPA); requires mpv (brew install mpv)
 (use-package eradio
@@ -840,7 +843,9 @@ where `syntax-ppss' does not reliably identify node types."
          ("C-c r s" . eradio-stop))
   :config
   (setq eradio-player '("mpv" "--no-video"))
-  (setq eradio-channels (ao/read-from-file (expand-file-name "radios" user-emacs-directory))))
+  (let ((radios (expand-file-name "radios" user-emacs-directory)))
+    (when (file-exists-p radios)
+      (setq eradio-channels (ao/read-from-file radios)))))
 
 (defun ao/my-search-radio-browser (country)
   "Search for radio stations by country on radio-browser.info."
