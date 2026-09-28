@@ -1,6 +1,6 @@
 ;;; btc-price.el --- Display BTC price in the modeline -*- lexical-binding: t; -*-
 
-;; Author: anevolbap
+;; Author: Pablo Vena
 ;; Description: Fetches Bitcoin price from CoinGecko and shows it in the modeline.
 ;; Usage: M-x btc-price-mode
 

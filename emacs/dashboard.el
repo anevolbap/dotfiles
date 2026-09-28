@@ -1,6 +1,6 @@
 ;;; dashboard.el --- Quick-view dashboard buffer -*- lexical-binding: t; -*-
 
-;; Author: anevolbap
+;; Author: Pablo Vena
 ;; Description: World-clock + BTC price + weekly agenda in a closable buffer.
 ;; Usage: M-x dashboard-show (bound to C-c s).  Press q or ESC to dismiss.
 
