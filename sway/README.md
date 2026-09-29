@@ -25,7 +25,7 @@ This repo does not manage system packages. Install them once per machine:
 
 ```sh
 sudo apt install sway xwayland swaylock swayidle xdg-desktop-portal-wlr \
-    brightnessctl playerctl slurp grim wl-clipboard fuzzel
+    brightnessctl playerctl slurp grim wl-clipboard fuzzel wlsunset
 ```
 
 `xwayland` is required for X-only programs, including an Emacs built without

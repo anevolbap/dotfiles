@@ -254,6 +254,9 @@ exec swayidle -w \
     before-sleep 'swaylock -f -c 000000'
 bindsym $mod+Escape exec swaylock -f -c 000000
 
+# Night light: warm the screen from 19:30 to 07:00 on fixed times.
+exec wlsunset -S 07:00 -s 19:30 -t 4000 -T 6500
+
 # Screenshot of a selected region, copied to the clipboard.
 bindsym Shift+Print exec grim -g "$(slurp)" - | wl-copy
 
