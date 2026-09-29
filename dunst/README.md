@@ -129,13 +129,15 @@ dunstctl context           # action menu for the top notification
 dunstctl set-paused toggle # mute and unmute notifications
 ```
 
-Right click and `dunstctl context` need `dmenu` to pick between actions:
+Right click and `dunstctl context` use `fuzzel --dmenu` to pick between
+actions:
 
 ```sh
-sudo apt install suckless-tools
+sudo apt install fuzzel
 ```
 
-Without it, left click still runs a notification's default action.
+Fuzzel is Wayland only, so the action menu works in the sway session but not
+under XFCE. Without it, left click still runs a notification's default action.
 
 ## Notes
 

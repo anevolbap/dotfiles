@@ -87,7 +87,7 @@
     ### Mouse ###
 
     # Left click runs the notification's default action if it has one,
-    # then closes it. Right click needs dmenu, see dunst/README.md.
+    # then closes it. Right click needs fuzzel, see dunst/README.md.
     mouse_left_click = do_action, close_current
     mouse_middle_click = close_all
     mouse_right_click = context
@@ -96,7 +96,7 @@
 
     # Opens URLs from notification bodies with the desktop default.
     browser = /usr/bin/xdg-open
-    dmenu = /usr/bin/dmenu -p dunst:
+    dmenu = /usr/bin/fuzzel --dmenu --prompt "dunst: "
 
     ### Window identity, so a window manager can target dunst ###
 
