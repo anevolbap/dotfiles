@@ -155,6 +155,15 @@
        (org-agenda-cmp-user-defined #'ao/agenda-cmp-updated)
        (org-agenda-prefix-format '((tags . "  ")))
        (org-agenda-overriding-header "Claude sessions")))
+     ;; Open entries with a NEXT: line in their body, grouped by parent heading
+     ;; (the project in projects.org), with the NEXT: text shown under each one.
+     ("p" "Pick up (entries with a NEXT: line)"
+      alltodo ""
+      ((org-agenda-skip-function #'ao/agenda-skip-unless-next)
+       (org-super-agenda-groups '((:auto-parent t)))
+       (org-agenda-prefix-format '((todo . "  ")))
+       (org-agenda-finalize-hook '(ao/agenda-insert-next-actions))
+       (org-agenda-overriding-header "Pick up")))
      ("A" "Daily agenda and top priority tasks"
       ((agenda "" ((org-agenda-span 1)
                    (org-deadline-warning-days 0)
@@ -288,6 +297,33 @@ Returns +1, -1 or nil as `org-agenda-cmp-user-defined' requires."
                              ((< ta tb) -1)))
           (ta +1)
           (tb -1))))
+
+(defun ao/entry-next-action (pom)
+  "Return the last NEXT: line in the body of the entry at POM, or nil."
+  (org-with-point-at pom
+    (org-back-to-heading t)
+    (let ((end (save-excursion (outline-next-heading) (point)))
+          next)
+      (while (re-search-forward "^NEXT:.*$" end t)
+        (setq next (match-string-no-properties 0)))
+      next)))
+
+(defun ao/agenda-skip-unless-next ()
+  "Skip agenda entries whose body has no NEXT: line."
+  (unless (ao/entry-next-action (point))
+    (save-excursion (outline-next-heading) (point))))
+
+(defun ao/agenda-insert-next-actions ()
+  "Insert the NEXT: line of each agenda entry on the line below it."
+  (let ((inhibit-read-only t))
+    (save-excursion
+      (goto-char (point-min))
+      (while (not (eobp))
+        (let ((next (when-let* ((marker (get-text-property (point) 'org-hd-marker)))
+                      (ao/entry-next-action marker))))
+          (forward-line 1)
+          (when next
+            (insert "      " (propertize next 'face 'shadow) "\n")))))))
 
 (defun ao/session-projects ()
   "Return the distinct :PROJECT: values in `claude-sessions-org-file'."
