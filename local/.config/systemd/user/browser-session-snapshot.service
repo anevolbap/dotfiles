@@ -1,0 +1,6 @@
+[Unit]
+Description=Copy the browser sessions to ~/.local/state/browser-sessions
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/browser-session-snapshot

@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""
+browser-session-snapshot — keep dated copies of the browser session.
+
+Firefox keeps only a few session files (sessionstore.jsonlz4 and the files in
+sessionstore-backups/) and overwrites them every few seconds.  After a closed
+window or a bad restart, the good state is gone within minutes.  This copies
+the newest session file of each profile to
+
+    ~/.local/state/browser-sessions/<browser>/<profile>/YYYYMMDD-HHMM.jsonlz4
+
+and writes ~/Documents/org/browser-tabs.org: one heading per profile (most
+recently used first), one per window, one link per tab.  A copy is skipped
+when the session did not change, and the org file is only rewritten when a
+copy was made.  Copies older than KEEP_DAYS are deleted, but the newest one
+is always kept.
+
+Works for browsers that use the Firefox session format; add others to
+BROWSERS.  Run by browser-session-snapshot.timer every 15 minutes.
+
+To restore a snapshot: quit the browser, then copy it over the live file and
+start the browser again (History > Restore Previous Session if it does not
+restore by itself):
+
+    cp ~/.local/state/browser-sessions/firefox/<profile>/<time>.jsonlz4 \
+       ~/.mozilla/firefox/<profile>/sessionstore.jsonlz4
+
+Needs python3-lz4 (Debian package).
+"""
+
+import json
+import time
+from pathlib import Path
+
+import lz4.block
+
+KEEP_DAYS = 7
+BROWSERS = {"Firefox": Path.home() / ".mozilla/firefox",
+            "LibreWolf": Path.home() / ".librewolf"}
+OUT_DIR = Path.home() / ".local/state/browser-sessions"
+ORG_FILE = Path.home() / "Documents/org/browser-tabs.org"
+
+
+def read_session(path):
+    data = path.read_bytes()
+    # mozlz4: 8-byte magic, then an lz4 block with its size header.
+    return json.loads(lz4.block.decompress(data[8:]))
+
+
+def current_entry(tab):
+    entries = tab.get("entries") or [{}]
+    return entries[min(max(tab.get("index", len(entries)) - 1, 0), len(entries) - 1)]
+
+
+def org_link(entry):
+    url = entry.get("url", "").replace("[", "%5B").replace("]", "%5D")
+    title = entry.get("title") or url
+    title = title.replace("[", "(").replace("]", ")")
+    return f"[[{url}][{title}]]"
+
+
+def org_time(seconds=None):
+    return time.strftime("[%Y-%m-%d %a %H:%M]", time.localtime(seconds))
+
+
+def write_org(profiles, path):
+    lines = [":PROPERTIES:", f":UPDATED:  {org_time()}", ":END:",
+             "#+title: Browser tabs", "#+startup: overview", ""]
+    for browser, profile, source, snapshot in profiles:
+        lines += [f"* {browser} {profile.name}", ":PROPERTIES:", f":SNAPSHOT: {snapshot}",
+                  f":SOURCE:   {source}", ":END:"]
+        session = read_session(snapshot)
+        for label, windows in [("Window", session.get("windows", [])),
+                               ("Closed window", session.get("_closedWindows", []))]:
+            for i, window in enumerate(windows, 1):
+                lines.append(f"** {label} {i} ({len(window['tabs'])} tabs)")
+                if window.get("closedAt"):
+                    lines += [":PROPERTIES:", f":CLOSED_AT: {org_time(window['closedAt'] / 1000)}", ":END:"]
+                lines += [f"*** {org_link(current_entry(tab))}" + (" :pinned:" if tab.get("pinned") else "")
+                          for tab in sorted(window["tabs"], key=lambda t: (t.get("pinned", False), t.get("lastAccessed", 0)),
+                                             reverse=True)]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n")
+
+
+def snapshot(out, source):
+    """Copy source into out if it changed.  Return (newest copy, changed)."""
+    data = source.read_bytes()
+    out.mkdir(parents=True, exist_ok=True)
+    snaps = sorted(out.glob("*.jsonlz4"))
+    changed = not snaps or snaps[-1].read_bytes() != data
+    if changed:
+        (out / time.strftime("%Y%m%d-%H%M.jsonlz4")).write_bytes(data)
+        snaps = sorted(out.glob("*.jsonlz4"))
+
+    limit = time.time() - KEEP_DAYS * 86400
+    for old in snaps[:-1]:
+        if old.stat().st_mtime < limit:
+            old.unlink()
+    return snaps[-1], changed
+
+
+def main():
+    profiles, any_changed = [], False
+    for browser, base in BROWSERS.items():
+        for profile in sorted(base.glob("*/")):
+            candidates = [p for p in [profile / "sessionstore.jsonlz4",
+                                      profile / "sessionstore-backups/recovery.jsonlz4"] if p.exists()]
+            if not candidates:
+                continue
+            source = max(candidates, key=lambda p: p.stat().st_mtime)
+            copy, changed = snapshot(OUT_DIR / browser.lower() / profile.name, source)
+            profiles.append((source.stat().st_mtime, browser, profile, source, copy))
+            any_changed |= changed
+    if any_changed or not ORG_FILE.exists():
+        profiles.sort(key=lambda p: p[0], reverse=True)
+        write_org([p[1:] for p in profiles], ORG_FILE)
+
+
+if __name__ == "__main__":
+    main()

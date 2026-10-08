@@ -1,6 +1,0 @@
-[Unit]
-Description=Copy the Firefox session to ~/.local/state/firefox-sessions
-
-[Service]
-Type=oneshot
-ExecStart=%h/.local/bin/firefox-session-snapshot
