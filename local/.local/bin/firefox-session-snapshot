@@ -70,7 +70,8 @@ def write_org(session, path, source, snapshot):
             lines.append(f"* {label} {i} ({len(window['tabs'])} tabs)")
             if window.get("closedAt"):
                 lines += [":PROPERTIES:", f":CLOSED_AT: {org_time(window['closedAt'] / 1000)}", ":END:"]
-            lines += [f"** {org_link(current_entry(tab))}" for tab in window["tabs"]]
+            lines += [f"** {org_link(current_entry(tab))}" + (" :pinned:" if tab.get("pinned") else "")
+                      for tab in window["tabs"]]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n")
 
