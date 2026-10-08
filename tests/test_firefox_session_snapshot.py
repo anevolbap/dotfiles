@@ -25,7 +25,8 @@ def tab(title, url):
 
 
 SESSION = {
-    "windows": [{"tabs": [tab("Docs [draft]", "https://example.com/a"), {**tab("B", "https://example.com/b"), "pinned": True}]}],
+    "windows": [{"tabs": [{**tab("Docs [draft]", "https://example.com/a"), "lastAccessed": 1},
+                          {**tab("B", "https://example.com/b"), "pinned": True, "lastAccessed": 2}]}],
     "_closedWindows": [{"tabs": [tab("Closed", "https://example.com/c")], "closedAt": 1_700_000_000_000}],
 }
 
@@ -52,6 +53,7 @@ def test_copies_session_and_writes_org(home):
     assert "* Window 1 (2 tabs)" in org
     assert "** [[https://example.com/b][B]] :pinned:" in org
     assert "** [[https://example.com/a][Docs (draft)]]\n" in org
+    assert org.index("example.com/b") < org.index("example.com/a")
     assert "* Closed window 1 (1 tabs)" in org
     assert org.startswith(":PROPERTIES:\n:UPDATED:  [")
     assert f":SNAPSHOT: {snaps[0]}\n" in org
