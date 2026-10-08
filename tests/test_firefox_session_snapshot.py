@@ -26,7 +26,8 @@ def tab(title, url):
 
 SESSION = {
     "windows": [{"tabs": [{**tab("Docs [draft]", "https://example.com/a"), "lastAccessed": 1},
-                          {**tab("B", "https://example.com/b"), "pinned": True, "lastAccessed": 2}]}],
+                          {**tab("B", "https://example.com/b"), "pinned": True, "lastAccessed": 2},
+                          {**tab("C", "https://example.com/new"), "lastAccessed": 3}]}],
     "_closedWindows": [{"tabs": [tab("Closed", "https://example.com/c")], "closedAt": 1_700_000_000_000}],
 }
 
@@ -50,10 +51,10 @@ def test_copies_session_and_writes_org(home):
     assert len(snaps) == 1
     assert snaps[0].read_bytes() == mozlz4(SESSION)
     org = (home / "Documents/org/firefox-tabs.org").read_text()
-    assert "* Window 1 (2 tabs)" in org
+    assert "* Window 1 (3 tabs)" in org
     assert "** [[https://example.com/b][B]] :pinned:" in org
     assert "** [[https://example.com/a][Docs (draft)]]\n" in org
-    assert org.index("example.com/b") < org.index("example.com/a")
+    assert org.index("example.com/b") < org.index("example.com/new") < org.index("example.com/a")
     assert "* Closed window 1 (1 tabs)" in org
     assert org.startswith(":PROPERTIES:\n:UPDATED:  [")
     assert f":SNAPSHOT: {snaps[0]}\n" in org
