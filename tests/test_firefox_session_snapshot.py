@@ -48,7 +48,7 @@ def test_copies_session_and_writes_org(home):
     snaps = sorted(out.glob("*.jsonlz4"))
     assert len(snaps) == 1
     assert snaps[0].read_bytes() == mozlz4(SESSION)
-    org = (out / "tabs.org").read_text()
+    org = (home / "Documents/org/firefox-tabs.org").read_text()
     assert "* Window 1 (2 tabs)" in org
     assert "** [[https://example.com/a][Docs (draft)]]" in org
     assert "* Closed window 1 (1 tabs)" in org

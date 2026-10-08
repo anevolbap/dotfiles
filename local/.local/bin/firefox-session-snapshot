@@ -9,7 +9,8 @@ the newest session file of each profile to
 
     ~/.local/state/firefox-sessions/<profile>/YYYYMMDD-HHMM.jsonlz4
 
-and writes tabs.org next to it: one heading per window, one link per tab.
+and writes ~/Documents/org/firefox-tabs.org: one heading per window, one
+link per tab.  With more than one profile in use, the last one wins.
 A copy is skipped when the session did not change.  Copies older than
 KEEP_DAYS are deleted, but the newest one is always kept.
 
@@ -35,6 +36,7 @@ import lz4.block
 KEEP_DAYS = 7
 FIREFOX_DIR = Path.home() / ".mozilla/firefox"
 OUT_DIR = Path.home() / ".local/state/firefox-sessions"
+ORG_FILE = Path.home() / "Documents/org/firefox-tabs.org"
 
 
 def read_session(path):
@@ -62,6 +64,7 @@ def write_org(session, path, source):
         for i, window in enumerate(windows, 1):
             lines.append(f"* {label} {i} ({len(window['tabs'])} tabs)")
             lines += [f"** {org_link(current_entry(tab))}" for tab in window["tabs"]]
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n")
 
 
@@ -80,7 +83,7 @@ def snapshot(profile):
     if not snaps or snaps[-1].read_bytes() != data:
         new = out / time.strftime("%Y%m%d-%H%M.jsonlz4")
         new.write_bytes(data)
-        write_org(read_session(new), out / "tabs.org", source)
+        write_org(read_session(new), ORG_FILE, source)
         snaps = sorted(out.glob("*.jsonlz4"))
 
     limit = time.time() - KEEP_DAYS * 86400
