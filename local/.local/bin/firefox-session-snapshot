@@ -57,12 +57,19 @@ def org_link(entry):
     return f"[[{url}][{title}]]"
 
 
-def write_org(session, path, source):
-    lines = [f"#+title: Firefox tabs, {time.strftime('%Y-%m-%d %H:%M')}", f"# From {source}", ""]
+def org_time(seconds=None):
+    return time.strftime("[%Y-%m-%d %a %H:%M]", time.localtime(seconds))
+
+
+def write_org(session, path, source, snapshot):
+    lines = [":PROPERTIES:", f":UPDATED:  {org_time()}", f":SNAPSHOT: {snapshot}",
+             f":SOURCE:   {source}", ":END:", "#+title: Firefox tabs", "#+startup: overview", ""]
     for label, windows in [("Window", session.get("windows", [])),
                            ("Closed window", session.get("_closedWindows", []))]:
         for i, window in enumerate(windows, 1):
             lines.append(f"* {label} {i} ({len(window['tabs'])} tabs)")
+            if window.get("closedAt"):
+                lines += [":PROPERTIES:", f":CLOSED_AT: {org_time(window['closedAt'] / 1000)}", ":END:"]
             lines += [f"** {org_link(current_entry(tab))}" for tab in window["tabs"]]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n")
@@ -83,7 +90,7 @@ def snapshot(profile):
     if not snaps or snaps[-1].read_bytes() != data:
         new = out / time.strftime("%Y%m%d-%H%M.jsonlz4")
         new.write_bytes(data)
-        write_org(read_session(new), ORG_FILE, source)
+        write_org(read_session(new), ORG_FILE, source, new)
         snaps = sorted(out.glob("*.jsonlz4"))
 
     limit = time.time() - KEEP_DAYS * 86400

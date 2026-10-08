@@ -52,6 +52,10 @@ def test_copies_session_and_writes_org(home):
     assert "* Window 1 (2 tabs)" in org
     assert "** [[https://example.com/a][Docs (draft)]]" in org
     assert "* Closed window 1 (1 tabs)" in org
+    assert org.startswith(":PROPERTIES:\n:UPDATED:  [")
+    assert f":SNAPSHOT: {snaps[0]}\n" in org
+    assert "#+title: Firefox tabs\n#+startup: overview\n" in org
+    assert ":CLOSED_AT: [2023-11-1" in org
 
 
 def test_unchanged_session_is_not_copied_again(home):
