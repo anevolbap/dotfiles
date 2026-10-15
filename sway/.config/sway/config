@@ -264,4 +264,12 @@ bindsym --locked XF86AudioPlay exec playerctl play-pause
 bindsym --locked XF86AudioNext exec playerctl next
 bindsym --locked XF86AudioPrev exec playerctl previous
 
+# Volume and brightness keys, with a dunst popup that shows the new level.
+# These replace the stock bindings above.
+bindsym --locked XF86AudioMute exec ~/.local/bin/osd volume mute
+bindsym --locked XF86AudioLowerVolume exec ~/.local/bin/osd volume down
+bindsym --locked XF86AudioRaiseVolume exec ~/.local/bin/osd volume up
+bindsym --locked XF86MonBrightnessDown exec ~/.local/bin/osd brightness down
+bindsym --locked XF86MonBrightnessUp exec ~/.local/bin/osd brightness up
+
 include /etc/sway/config.d/*

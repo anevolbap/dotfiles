@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+#
+# osd — change volume or brightness and show the new level in a popup.
+#
+# The popup is a dunst notification with a value hint, so dunst draws a
+# progress bar. A stack tag makes repeated key presses update one popup instead
+# of stacking new ones, and the transient flag keeps it out of history.
+#
+# Usage:
+#     osd volume up|down|mute
+#     osd brightness up|down
+
+set -u
+
+step=5
+
+case "${1:-} ${2:-}" in
+    "volume up")       pactl set-sink-volume @DEFAULT_SINK@ "+$step%" ;;
+    "volume down")     pactl set-sink-volume @DEFAULT_SINK@ "-$step%" ;;
+    "volume mute")     pactl set-sink-mute @DEFAULT_SINK@ toggle ;;
+    "brightness up")   brightnessctl -q set "$step%+" ;;
+    "brightness down") brightnessctl -q set "$step%-" ;;
+    *)
+        echo "usage: osd volume up|down|mute" >&2
+        echo "       osd brightness up|down" >&2
+        exit 2
+        ;;
+esac
+
+if [ "$1" = volume ]; then
+    # First channel's percentage, e.g. "51" from "front-left: 33370 /  51% / ...".
+    value=$(pactl get-sink-volume @DEFAULT_SINK@ | grep -o '[0-9]*%' | head -n 1 | tr -d %)
+    if pactl get-sink-mute @DEFAULT_SINK@ | grep -q yes; then
+        icon=audio-volume-muted-symbolic
+        summary="Volume: muted"
+    else
+        icon=audio-volume-high-symbolic
+        summary="Volume: $value%"
+    fi
+else
+    # Machine-readable output: device,class,current,percent,max.
+    value=$(brightnessctl -m | cut -d, -f4 | tr -d %)
+    icon=display-brightness-symbolic
+    summary="Brightness: $value%"
+fi
+
+notify-send --transient --expire-time=1500 --app-name=osd --icon="$icon" \
+    --hint="string:x-dunst-stack-tag:osd-$1" --hint="int:value:$value" \
+    "$summary"
