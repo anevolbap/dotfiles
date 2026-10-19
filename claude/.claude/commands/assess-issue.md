@@ -1,3 +1,7 @@
+---
+description: Check whether a GitHub issue is worth picking up (claimed status, feasibility, verified claims), then stop before implementation
+argument-hint: <owner/repo#NUM, or NUM>
+---
 # Assess GitHub Issue
 
 Assess whether a GitHub issue is worth picking up. Stop before implementation.
@@ -6,7 +10,7 @@ Argument: `owner/repo#NUM` or just `NUM` if the issue lives in the current repo'
 
 Steps:
 1. Fetch the issue: `gh issue view <NUM> --repo <owner>/<repo>`.
-2. Rename the session to label its focus: `/rename issue-<NUM>`.
+2. Suggest that I rename the session to label its focus: `/rename issue-<NUM>`.
 3. Check for existing PRs that reference it: `gh pr list --repo <owner>/<repo> --search "<NUM>" --state all`. Also scan the issue's linked PRs, timeline, and assignees for partial work or claimed status.
 4. If claimed or in progress, stop and report. Do not proceed to step 5.
 5. Explore the codebase to confirm feasibility. Use `rg` over the relevant paths. Read only the regions you need.
@@ -18,4 +22,4 @@ Steps:
    - Risks: what could break.
    - Effort: trivial / small / medium / large per the planning bucket in `~/CLAUDE.md`.
 8. Stop. Do not start implementation until I confirm. If you draft a comment for the issue, follow the communication rules in `~/.claude/oss-contributions.md`: terse, question-oriented, no preamble, no mention of unrelated PRs, draft-first for my approval.
-9. After I confirm, add a tracker entry to `~/Documents/org/projects.org` under the right project heading. Use the heading format `** TODO [[<issue_url>][Issue #N]] - <title> :tags:` (state changes to ONGOING once a branch or comment exists). Body paragraphs unwrapped, one paragraph per line. See `~/CLAUDE.md` for the full file conventions.
+9. After I confirm, track the issue with the `track` skill: a `TODO` entry in `~/Documents/org/projects.org` under the project heading, with a `NEXT:` line.

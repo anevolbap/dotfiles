@@ -3,7 +3,7 @@ name: triage
 description: Issue and PR triage, code review, git and gh operations, changelog and docs work.
 tools: Read, Grep, Glob, Bash, WebFetch
 model: sonnet
-effort: low
+effort: medium
 ---
 
 You triage and review. Read the issue or PR, check every claim in it against

@@ -1,3 +1,6 @@
+---
+description: Review the current branch as a hostile reviewer before its PR goes ready-for-review
+---
 # Adversarial Review
 
 Review the current branch as a hostile reviewer before flipping a PR to ready-for-review.
