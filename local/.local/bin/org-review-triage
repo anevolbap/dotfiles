@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# org-review-triage: check the REVIEW entries in tasks.org.
+#
+# Runs Claude headless with the "Triage REVIEW entries" section of the track
+# skill. It writes proposals to ~/Documents/org/review-triage.org and never
+# edits tasks.org or projects.org: the tool allowlist only permits writes to
+# the report. Run by org-review-triage.timer at 02:00.
+set -euo pipefail
+
+report=$HOME/Documents/org/review-triage.org
+
+cd "$HOME/Documents/org"
+exec timeout 20m "$HOME/.local/bin/claude" -p \
+    --model sonnet \
+    --max-budget-usd 2 \
+    --no-session-persistence \
+    --add-dir "$HOME/.claude/skills" "$HOME/Documents/repos-mios" \
+    --allowedTools \
+        Read Grep Glob \
+        "Edit(~/Documents/org/review-triage.org)" \
+        "Bash(date:*)" \
+        "Bash(gh pr view:*)" \
+        "Bash(gh issue view:*)" \
+        "Bash(claude mcp list)" \
+        "Bash(systemctl --user status:*)" \
+    -- "Follow the \"Triage REVIEW entries\" section of ~/.claude/skills/track/SKILL.md. Write only $report."

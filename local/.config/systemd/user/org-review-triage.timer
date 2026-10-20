@@ -1,0 +1,11 @@
+[Unit]
+Description=Triage REVIEW entries every night, and once after waking if a run was missed
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+# A laptop asleep or off at 02:00 skips the run. Persistent runs it once as
+# soon as the machine is back.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
