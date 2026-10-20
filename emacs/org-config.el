@@ -591,6 +591,20 @@ that fails."
   (org-roam-db-autosync-mode))
 
 ;; ============================================================================
+;; org-contacts — address book as org headings with EMAIL/PHONE/BIRTHDAY props
+;; Usage: M-x org-contacts  (search)
+;;        org-contacts-export-as-vcard
+;; Birthdays show in the agenda via a %%(org-contacts-anniversaries) line in
+;; contacts.org.
+;; ============================================================================
+
+(use-package org-contacts
+  :ensure t
+  :after org
+  :custom
+  (org-contacts-files (list (expand-file-name "contacts.org" my-org-directory))))
+
+;; ============================================================================
 ;; ox-reveal — org export to reveal.js presentations
 ;; ============================================================================
 

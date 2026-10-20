@@ -27,4 +27,10 @@
       "* %^{Event Title}\n%^T\n%?"
       :empty-lines 1)
 
+ ;; --- Contact (org-contacts) ---
+ ("c" "Contact" entry
+      (file "contacts.org")
+      "* %^{Name}\n:PROPERTIES:\n:EMAIL: %^{Email}\n:PHONE: %^{Phone}\n:BIRTHDAY: %^{Birthday (YYYY-MM-DD)}\n:END:\n%?"
+      :empty-lines 1)
+
  )
