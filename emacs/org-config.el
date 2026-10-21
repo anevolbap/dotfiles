@@ -65,6 +65,9 @@
   ;; in the org directory, so it is an agenda file, and nothing should ever be
   ;; refiled into a file that gets rewritten wholesale.
   (org-refile-targets '((ao/refile-files :maxlevel . 3)))
+  ;; projects.org keeps each entry's background under a *** Context
+  ;; sub-heading; those are notes, not places to refile into.
+  (org-refile-target-verify-function #'ao/refile-target-p)
   (org-refile-use-outline-path 'file)
   (org-outline-path-complete-in-steps nil)
 
@@ -313,6 +316,10 @@ also drops the file-level target, which that hook never sees."
                      (equal (expand-file-name file)
                             (expand-file-name claude-sessions-org-file))))
               (org-agenda-files)))
+
+(defun ao/refile-target-p ()
+  "Return nil for a heading titled Context, so it is not a refile target."
+  (not (equal (org-get-heading t t t t) "Context")))
 
 (defun ao/agenda-updated-time (entry)
   "Return the :UPDATED: time of agenda line ENTRY in seconds, or nil."
