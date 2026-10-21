@@ -36,14 +36,27 @@ projects.org, for a PR or issue:
 :END:
 One or two sentences: what this is and where it stands.
 
-Done:
-- what was checked, decided or done, with evidence (=command= or file:line)
-
 Pending:
 - [ ] step left to do
 - [X] step finished since the entry was written
+
 NEXT: one concrete next action.
+
+*** Context
+Background paragraph, one per line.
+
+Next paragraph, after a blank line.
+
+Done:
+- [YYYY-MM-DD] what was checked, decided or done, with evidence (=command= or file:line)
 ```
+
+projects.org layout (the file opens with `#+STARTUP: overview`): the entry's own body is only the summary, the `Pending:` checklist and the `NEXT:` line, so the entry reads at a glance. Everything else (background paragraphs, the dated `Done:` log, old next steps, findings) goes under the `*** Context` sub-heading, which stays folded. Context may hold its own `****` sections when it gets complex. Rules:
+- `NEXT:` must stay in the entry's own body, above `*** Context`: the `p` view only reads the body up to the first sub-heading.
+- Keep every checkbox in the entry's own body. An entry with a `[x/y]` cookie and a Context sub-heading needs `:COOKIE_DATA: checkbox` in its drawer, or the cookie counts child headings.
+- Separate paragraphs and groups with one blank line. Each paragraph is one unwrapped line.
+- New facts are appended at the end of Context's `Done:` log as dated bullets (the log is oldest first). When you update an entry, refresh the summary if it no longer says where things stand.
+- `Context` sub-headings are excluded from refile targets (`ao/refile-target-p` in dotfiles `org-config.el`).
 
 Use `[[url][Issue #N]]` and an `:ISSUE:` property for issues. Personal work with no URL uses a plain `** STATE Title :tags:`. Bullets that reference issues use `[[url][#N]]`.
 
@@ -66,7 +79,7 @@ Pending:
 NEXT: one concrete next action.
 ```
 
-Body structure, for both files: summary first, then the `Done:` bullets, then the `Pending:` checklist, then `NEXT:` as the last line. Leave out a group that would be empty. Each bullet is one unwrapped line with one fact or step. No paragraph runs longer than two sentences, and details go in bullets. When a pending step is finished, tick it (`[X]`) and do not delete it. When you update an entry whose body is still a wall of text, rewrite that entry's body into this structure, keeping every fact.
+Body structure for tasks.org (projects.org uses the Context layout above): summary first, then the `Done:` bullets, then the `Pending:` checklist, then `NEXT:` as the last line. Leave out a group that would be empty. Each bullet is one unwrapped line with one fact or step. No paragraph runs longer than two sentences, and details go in bullets. When a pending step is finished, tick it (`[X]`) and do not delete it. When you update an entry whose body is still a wall of text, rewrite that entry's body into this structure, keeping every fact.
 
 Get the timestamp with `date '+%Y-%m-%d %a %H:%M'`. Tags cannot contain hyphens.
 
@@ -76,7 +89,7 @@ Get the timestamp with `date '+%Y-%m-%d %a %H:%M'`. Tags cannot contain hyphens.
 2. Set `:SESSION:` to `$CLAUDE_CODE_SESSION_ID` on meaningful progress.
 3. Keep exactly one live next action: the last `NEXT:` line in the body. Replace the old `NEXT:` line instead of stacking new ones. Write it as an action Pablo can start cold ("check #963 for a reply, then ..."), not a summary of what happened.
 4. Dates: if Pablo gives a date ("tomorrow", "Friday", "next week"), add a `SCHEDULED: <YYYY-MM-DD Day>` line right below the heading so it also shows in the daily agenda. A hard deadline uses `DEADLINE:`. No date given, no timestamp.
-5. When work ends: flip the keyword (MERGED with `:STATUS: merged [YYYY-MM-DD]`, `closed [YYYY-MM-DD]` for an issue closed externally, DONE for personal work), and replace the `NEXT:` line with a `Done:` bullet that holds the closing evidence, so the entry leaves `p`.
+5. When work ends: flip the keyword (MERGED with `:STATUS: merged [YYYY-MM-DD]`, `closed [YYYY-MM-DD]` for an issue closed externally, DONE for personal work), and replace the `NEXT:` line with a `Done:` bullet that holds the closing evidence, so the entry leaves `p`. In projects.org that closing bullet goes in the Context `Done:` log, and the summary should say how it ended.
 6. Body follows the structure above. Lines are unwrapped. Plain English, no em-dashes.
 7. Edit the files with the Edit tool. Do not reformat or touch other entries.
 
