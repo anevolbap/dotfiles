@@ -1,0 +1,12 @@
+[Unit]
+Description=Apply the triage proposals ticked in review-triage.org
+
+[Service]
+Type=oneshot
+StateDirectory=org-agent
+# Wait for a burst of saves to settle. Changes during the wait do not start a
+# second run, since the unit is already active.
+ExecStartPre=/bin/sleep 30
+ExecStart=%h/.local/bin/org-agent-apply
+StandardOutput=append:%S/org-agent/run.log
+StandardError=append:%S/org-agent/run.log
