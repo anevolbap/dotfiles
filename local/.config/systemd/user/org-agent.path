@@ -1,0 +1,11 @@
+[Unit]
+Description=Apply triage proposals ticked in review-triage.org when it is saved
+
+[Path]
+# Fires on every write, including the nightly triage run and org-agent-apply's
+# own edit. The script exits early unless a proposal is ticked.
+PathChanged=%h/Documents/org/review-triage.org
+Unit=org-agent.service
+
+[Install]
+WantedBy=default.target

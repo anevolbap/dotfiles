@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# org-agent-apply: apply the triage proposals ticked in review-triage.org.
+#
+# Ticking `- [ ] apply` under a proposal and saving the report approves it.
+# org-agent.path starts this script when the report changes. It runs Claude
+# headless with the "Apply triage proposals" section of the track skill, and
+# the tool allowlist only permits edits to tasks.org, projects.org and the
+# report. A desktop notification shows the one-line result.
+#
+# It does nothing when no proposal is ticked, which also covers the run
+# triggered by its own write to the report. It refuses to write while Emacs
+# has unsaved changes in one of the three files, since the edit on disk would
+# then fight the buffer; saving again retries.
+#
+# ORG_DIR, CLAUDE and SKILL_DIR override the org directory, the claude binary
+# and the skills directory (tests).
+set -euo pipefail
+
+org=${ORG_DIR:-$HOME/Documents/org}
+claude=${CLAUDE:-$HOME/.local/bin/claude}
+skills=${SKILL_DIR:-$HOME/.claude/skills}
+report=$org/review-triage.org
+files=("$org/tasks.org" "$org/projects.org" "$report")
+
+if ! grep -qE '^[[:space:]]*- \[X\] apply[[:space:]]*$' "$report" 2>/dev/null; then
+    echo "nothing ticked in $report"
+    exit 0
+fi
+
+# Ask the Emacs daemon for a modified buffer visiting one of the files. No
+# daemon means no buffer can be modified, so carry on.
+list=$(printf '"%s" ' "${files[@]}")
+unsaved=$(emacsclient -e "(let ((files (list $list)))
+  (seq-some (lambda (b)
+              (let ((f (buffer-file-name b)))
+                (and f (buffer-modified-p b)
+                     (member (expand-file-name f) files) f)))
+            (buffer-list)))" 2>/dev/null) || unsaved=nil
+
+if [ "$unsaved" != nil ]; then
+    msg="triage apply skipped: unsaved changes in ${unsaved//\"/}. Save, then save the report again."
+    echo "$msg"
+    notify-send "org-agent" "$msg"
+    exit 0
+fi
+
+cd "$org"
+summary=$(timeout 10m "$claude" -p \
+    --model sonnet \
+    --max-budget-usd 1 \
+    --no-session-persistence \
+    --add-dir "$skills" \
+    --allowedTools \
+        Read Grep Glob \
+        "Edit(/${files[0]})" \
+        "Edit(/${files[1]})" \
+        "Edit(/${files[2]})" \
+        "Bash(date:*)" \
+    -- "Follow the \"Apply triage proposals\" section of $skills/track/SKILL.md. Apply only the proposals in $report whose line reads \"- [X] apply\". End with the one-line summary that section asks for." \
+    | tail -n 1)
+
+echo "$summary"
+notify-send "org-agent" "$summary"

@@ -107,6 +107,7 @@ NEXT: read the proposals in review-triage.org and say which to apply ("apply rev
 One sentence: the claim and the verdict.
 - Check: =<command>= showed <result>
 - Change: <exact change: keyword, CLOSED stamp, Done: bullet, or the new NEXT: line>
+- [ ] apply
 - [ ] for UNSURE: what Pablo should look at
 ** Hygiene
 *** Missing NEXT:
@@ -117,8 +118,18 @@ One sentence: the claim and the verdict.
 - tasks.org:<line> <heading>
 ```
 
+   DONE and REOPEN proposals end with the line `- [ ] apply`, exactly that text, so Pablo can approve one by ticking it. UNSURE proposals get no `apply` line, since there is no change to apply.
+
    One fact per bullet, no paragraphs. Leave out a hygiene group that has no findings. Collapse long lists of the same kind (for example many reading links with no `NEXT:`) into one bullet with a count and line numbers.
 
    If there are no REVIEW entries and no hygiene findings, write the top entry as `* DONE Review triage [date]` with no `NEXT:` line, so nothing shows in `p`.
 
-Applying: when Pablo approves some or all proposals, make those changes with the Edit tool (DONE gets a `CLOSED: [YYYY-MM-DD Day HH:MM]` line under the heading and a `Done:` bullet with the evidence in place of `NEXT:`; REOPEN gets the open keyword and the `NEXT:` line). Then set the report's top entry to DONE and remove its `NEXT:` line.
+## Apply triage proposals
+
+A proposal is approved in one of two ways: Pablo says so in chat ("apply review triage", "apply the first two"), or he ticks its `- [ ] apply` line in `review-triage.org`. The second way is run by `org-agent-apply`, which starts this step on its own when he saves the report with a ticked `- [X] apply` line.
+
+1. Apply only approved proposals. When started by `org-agent-apply`, those are exactly the proposals whose line reads `- [X] apply`. Leave every other proposal as it is.
+2. Make each change with the Edit tool, at the line the proposal names, after checking that the heading there still matches. If it does not, skip the proposal and say so. DONE gets a `CLOSED: [YYYY-MM-DD Day HH:MM]` line under the heading and a bullet with the evidence in the entry's `Done:` group, which follows the summary (create the group there if it is missing), and the `NEXT:` line is removed. REOPEN gets the open keyword and the `NEXT:` line as the last line of the body.
+3. In the report, change each applied proposal's line to `- [X] applied [YYYY-MM-DD]`, and a skipped one to `- [ ] apply (skipped: <reason>)`. This keeps a second run from applying anything twice.
+4. When no `- [ ] apply` line is left, set the report's top entry to DONE and remove its `NEXT:` line.
+5. End with one line of at most 120 characters that says what changed, for example `applied 2: Definir OSDE -> DONE, Bitaxe health -> TODO`. `org-agent-apply` shows this line as a desktop notification.
