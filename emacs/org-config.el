@@ -242,6 +242,39 @@
   (advice-add cmd :after #'ao/org-close-structure-block))
 
 ;; ============================================================================
+;; REVIEW becomes DONE when its last checkbox is ticked
+;;
+;; REVIEW means "closed, but the close should be checked". The checks are the
+;; entry's checkboxes, so ticking the last one is the confirmation. Only the
+;; entry's own body counts, not child headings. Open entries are left alone:
+;; an ONGOING entry with every box ticked may still have work in its NEXT: line.
+;; `org-checkbox-statistics-hook' runs after every tick, with or without a [/]
+;; cookie in the heading.
+;; ============================================================================
+
+(defun ao/review-done-when-checked ()
+  "Mark the REVIEW entry at point DONE once every checkbox in it is ticked.
+Add a CLOSED stamp unless the entry already has one."
+  (save-excursion
+    (when (and (derived-mode-p 'org-mode)
+               (ignore-errors (org-back-to-heading t) t)
+               (equal (org-get-todo-state) "REVIEW"))
+      (let ((end (save-excursion (outline-next-heading) (point)))
+            (boxes 0) (open 0))
+        (save-excursion
+          (while (re-search-forward
+                  "^[ \t]*\\(?:[-+*]\\|[0-9]+[.)]\\)[ \t]+\\[\\([ X-]\\)\\]" end t)
+            (setq boxes (1+ boxes))
+            (unless (equal (match-string 1) "X")
+              (setq open (1+ open)))))
+        (when (and (> boxes 0) (= open 0))
+          (org-todo "DONE")
+          (unless (org-entry-get nil "CLOSED")
+            (org-add-planning-info 'closed (org-current-effective-time))))))))
+
+(add-hook 'org-checkbox-statistics-hook #'ao/review-done-when-checked)
+
+;; ============================================================================
 ;; Claude Code sessions in the agenda
 ;;
 ;; Sessions live in claude-sessions.org, written by M-x claude-sessions-org-sync.
