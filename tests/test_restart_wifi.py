@@ -35,7 +35,7 @@ def hook(tmp_path):
     return run
 
 
-@pytest.mark.parametrize("kind", ["suspend", "hibernate", "suspend-then-hibernate"])
+@pytest.mark.parametrize("kind", ["hibernate", "suspend-then-hibernate"])
 def test_reloads_driver_after_resume(hook, kind):
     calls = hook("post", kind)
     assert "modprobe -r ath11k_pci" in calls
@@ -45,3 +45,7 @@ def test_reloads_driver_after_resume(hook, kind):
 @pytest.mark.parametrize("kind", ["suspend", "hibernate", "suspend-then-hibernate"])
 def test_does_nothing_before_sleep(hook, kind):
     assert hook("pre", kind) == []
+
+
+def test_does_nothing_after_plain_suspend(hook):
+    assert hook("post", "suspend") == []
