@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+"""PreToolUse hook: keep agent publishing inside repositories I own.
+
+Reads the Claude Code hook JSON on stdin and decides by where a command lands,
+not by what it is:
+
+- git push to a repository owned by OWNERS, or to a local path: no opinion.
+- git push anywhere else (an upstream I contribute to, someone's fork, another
+  host): exit 2, which blocks the call. I push upstream by hand if I want to.
+- gh writes (pr/issue create, comment, review, merge, edit, close, ..., and
+  gh api calls that write) to a repository not owned by OWNERS: ask me first.
+- anything it cannot parse that looks like a publish: ask me first.
+
+Without -R, gh picks its target from the clone, and in a fork clone
+`gh pr create` targets the parent. So a clone with any remote outside OWNERS
+counts as someone else's repository for gh writes.
+
+The target repository is read where the command runs, which may differ from
+the session's cwd: `git -C <path>` and `cd <path> &&` are followed.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+
+OWNERS = {"anevolbap"}
+
+GH_WRITES = {
+    "pr": {"create", "comment", "review", "merge", "edit", "close", "reopen", "ready"},
+    "issue": {"create", "comment", "edit", "close", "reopen", "delete", "transfer", "pin"},
+    "release": {"create", "edit", "delete", "upload"},
+}
+
+GITHUB_RE = re.compile(r"github\.com[:/]+([^/\s]+)/([^/\s]+?)(?:\.git)?(?:/|$)")
+OPERATORS = {"&&", "||", ";", "|", "&", "\n"}
+
+
+def owner_of(url):
+    """GitHub owner of a URL, '' for a local path, None for another host."""
+    m = GITHUB_RE.search(url)
+    if m:
+        return m.group(1)
+    if "://" in url or re.match(r"^[\w.-]+@[\w.-]+:", url):
+        return None
+    return ""
+
+
+def git_out(cwd, *args):
+    r = subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def remote_url(cwd, remote):
+    if "/" in remote or ":" in remote:  # already a URL or a path
+        return remote
+    return git_out(cwd, "remote", "get-url", "--push", remote)
+
+
+def default_push_remote(cwd):
+    """The remote a bare `git push` uses, in git's own order of precedence."""
+    branch = git_out(cwd, "symbolic-ref", "--short", "-q", "HEAD")
+    keys = ["remote.pushDefault"]
+    if branch:
+        keys = [f"branch.{branch}.pushRemote", *keys, f"branch.{branch}.remote"]
+    for key in keys:
+        value = git_out(cwd, "config", "--get", key)
+        if value:
+            return value
+    return "origin"
+
+
+def clone_is_mine(cwd):
+    urls = [git_out(cwd, "remote", "get-url", r) for r in git_out(cwd, "remote").split()]
+    owners = {owner_of(u) for u in urls if u}
+    return bool(owners) and owners <= OWNERS | {""}
+
+
+def segments(tokens):
+    seg = []
+    for tok in tokens:
+        if tok in OPERATORS:
+            if seg:
+                yield seg
+            seg = []
+        else:
+            seg.append(tok)
+    if seg:
+        yield seg
+
+
+def check_push(cwd, args):
+    """args: the tokens after `push`. Returns a block reason or None."""
+    remote = None
+    skip = False
+    for a in args:
+        if skip:
+            skip = False
+        elif a in ("-o", "--push-option", "--receive-pack", "--exec"):
+            skip = True
+        elif a.startswith("--repo="):
+            remote = a.split("=", 1)[1]
+            break
+        elif not a.startswith("-"):
+            remote = a
+            break
+    remote = remote or default_push_remote(cwd)
+    url = remote_url(cwd, remote)
+    owner = owner_of(url) if url else None
+    if owner == "" or owner in OWNERS:
+        return None
+    where = f"{remote} ({url})" if url and url != remote else remote
+    return (f"Blocked: git push to {where}, which is not one of my repositories "
+            f"({', '.join(sorted(OWNERS))}). Push to my fork and leave the upstream "
+            "step to me.")
+
+
+def gh_target_owners(cwd, args):
+    """Owners named by -R/--repo or by github.com URLs; None if none named."""
+    owners = set()
+    for i, a in enumerate(args):
+        if a in ("-R", "--repo") and i + 1 < len(args):
+            owners.add(args[i + 1].split("/")[0])
+        elif a.startswith("--repo="):
+            owners.add(a.split("=", 1)[1].split("/")[0])
+        else:
+            m = GITHUB_RE.search(a)
+            if m:
+                owners.add(m.group(1))
+    return owners or None
+
+
+def check_gh(cwd, args):
+    """args: the tokens after `gh`. Returns an ask reason or None."""
+    if not args:
+        return None
+    if args[0] == "api":
+        return check_gh_api(args[1:])
+    if len(args) < 2 or args[1] not in GH_WRITES.get(args[0], ()):
+        return None
+    owners = gh_target_owners(cwd, args[2:])
+    mine = owners <= OWNERS if owners is not None else clone_is_mine(cwd)
+    if mine:
+        return None
+    target = ", ".join(sorted(owners)) if owners else "the parent of this clone"
+    return f"gh {args[0]} {args[1]} writes to {target}, outside my repositories. Approve?"
+
+
+def check_gh_api(args):
+    method, has_fields, path, skip = None, False, None, False
+    for i, a in enumerate(args):
+        if skip:
+            skip = False
+            continue
+        if a in ("-X", "--method") and i + 1 < len(args):
+            method, skip = args[i + 1].upper(), True
+        elif a.startswith("--method="):
+            method = a.split("=", 1)[1].upper()
+        elif a in ("-f", "-F", "--field", "--raw-field", "--input"):
+            has_fields, skip = True, True
+        elif not a.startswith("-") and path is None:
+            path = a
+    if path == "graphql":
+        if "mutation" not in " ".join(args):
+            return None
+        return "gh api graphql mutation: the target owner cannot be checked. Approve?"
+    write = (method or ("POST" if has_fields else "GET")) != "GET"
+    if not write:
+        return None
+    m = re.match(r"^/?repos/([^/]+)/", path or "")
+    if m and m.group(1) in OWNERS:
+        return None
+    return f"gh api {method or 'POST'} {path} writes outside my repositories. Approve?"
+
+
+def decide(command, cwd):
+    """Returns ('block'|'ask', reason) or None."""
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|")
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except ValueError:
+        if re.search(r"\bgit\b.*\bpush\b|\bgh\s+(pr|issue|release|api)\b", command):
+            return "ask", "Could not parse a command that may publish. Approve?"
+        return None
+
+    for seg in segments(tokens):
+        while seg and re.match(r"^\w+=", seg[0]):  # VAR=value prefixes
+            seg = seg[1:]
+        if not seg:
+            continue
+        if seg[0] == "cd" and len(seg) > 1:
+            cwd = os.path.join(cwd, os.path.expanduser(seg[1]))
+            continue
+        if seg[0] == "git":
+            run_cwd, i = cwd, 1
+            while i < len(seg) and seg[i].startswith("-"):
+                if seg[i] == "-C" and i + 1 < len(seg):
+                    run_cwd = os.path.join(cwd, os.path.expanduser(seg[i + 1]))
+                    i += 2
+                elif seg[i] == "-c" and i + 1 < len(seg):
+                    i += 2
+                else:
+                    i += 1
+            if i < len(seg) and seg[i] == "push":
+                reason = check_push(run_cwd, seg[i + 1:])
+                if reason:
+                    return "block", reason
+        elif seg[0] == "gh":
+            reason = check_gh(cwd, seg[1:])
+            if reason:
+                return "ask", reason
+    return None
+
+
+def main():
+    try:
+        data = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        return 0
+    if data.get("tool_name") != "Bash":
+        return 0
+    command = (data.get("tool_input") or {}).get("command", "")
+    result = decide(command, data.get("cwd") or os.getcwd())
+    if result is None:
+        return 0
+    kind, reason = result
+    if kind == "block":
+        print(reason, file=sys.stderr)
+        return 2
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "ask",
+        "permissionDecisionReason": reason,
+    }}))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
