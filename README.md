@@ -15,7 +15,7 @@ packages. The `Makefile` links each one into place.
 |----------------|-------------------------------------------------|------------------------------|
 | `emacs/`       | Emacs 31 config (elpaca, eglot, org, eshell)    | `~/.emacs.d`                 |
 | `crkbd_layout/`| QMK keymap for the Corne (crkbd) keyboard       | `~/qmk_firmware/.../keymaps` |
-| `local/`       | Scripts in `~/.local/bin` and a systemd drop-in | `~`                          |
+| `local/`       | Scripts in `~/.local/bin` and systemd user units | `~`                         |
 | `claude/`      | Claude Code agents and commands                 | `~`                          |
 | `dunst/`       | dunst notification daemon, replaces xfce4-notifyd | `~`                        |
 | `sway/`        | sway window manager config                      | `~`                          |
@@ -50,12 +50,32 @@ orderless, consult, embark, corfu, and cape. Python uses eglot with the
 
 ## Scripts
 
+- `browser-session-snapshot`: keeps dated copies of the Firefox session files, which Firefox overwrites every few seconds.
 - `claude-branch-check`: Claude Code hook that blocks commits on shared branches.
+- `claude-publish-guard`: Claude Code hook that lets agents push and post only to my own repositories; elsewhere it blocks or asks.
 - `claude-token-report`: shows where Claude Code tokens go, from the transcripts.
 - `corne-rgb-alert`: makes the Corne blink over Raw HID (see [docs/corne-rgb-alert.md](docs/corne-rgb-alert.md)).
 - `notify-when-done`: runs a command and sends a desktop notification when it ends.
+- `org-agent-apply`: applies the triage proposals ticked in `review-triage.org`.
+- `org-review-triage`: runs Claude headless to propose actions for the REVIEW entries in `tasks.org`.
+- `osd`: changes volume or brightness and shows the level in a dunst popup.
 - `roam-problem`: writes a problem and fix note into org-roam (`$ROAM_DIR`, default `~/org/roam-notes`).
 - `sleep-doctor`: finds out why a resume from suspend ended in a black screen.
+
+### systemd user units
+
+`make local` links the units into `~/.config/systemd/user` but does not
+enable them. Enable the ones you want once:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now browser-session-snapshot.timer  # every 15 min
+systemctl --user enable --now org-review-triage.timer         # daily at 02:00
+systemctl --user enable --now org-agent.path                  # when review-triage.org changes
+```
+
+`emacs.service.d/restart.conf` is a drop-in for the Emacs daemon unit and
+needs no enable step.
 
 ## Personal overrides
 
