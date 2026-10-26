@@ -15,15 +15,15 @@ SCRIPT = Path(__file__).resolve().parents[1] / "local/.local/bin/org-agent-apply
 
 FAKES = {
     # Prints the summary line the skill asks for, so the script can notify.
-    "claude": 'echo "$@" >> "$FAKE_LOG/claude"\necho "applied 1: Definir OSDE -> DONE"',
+    "claude": 'echo "$@" >> "$FAKE_LOG/claude"\necho "applied 1: Renew passport -> DONE"',
     # FAKE_EMACS holds what the daemon would print, or "fail" for no daemon.
     "emacsclient": '[ "$FAKE_EMACS" = fail ] && exit 1\necho "$FAKE_EMACS"',
     "notify-send": 'echo "$@" >> "$FAKE_LOG/notify-send"',
 }
 
-TICKED = "* TODO Review triage\n** Definir OSDE -> DONE\n- [X] apply\n"
-UNTICKED = "* TODO Review triage\n** Definir OSDE -> DONE\n- [ ] apply\n"
-APPLIED = "* DONE Review triage\n** Definir OSDE -> DONE\n- [X] applied [2026-10-21]\n"
+TICKED = "* TODO Review triage\n** Renew passport -> DONE\n- [X] apply\n"
+UNTICKED = "* TODO Review triage\n** Renew passport -> DONE\n- [ ] apply\n"
+APPLIED = "* DONE Review triage\n** Renew passport -> DONE\n- [X] applied [2026-10-21]\n"
 
 
 @pytest.fixture
@@ -77,7 +77,7 @@ def test_ticked_runs_claude_with_edit_limited_to_org_files(env):
     for name in ("tasks.org", "projects.org", "review-triage.org"):
         assert f"Edit(/{org}/{name})" in claude
     assert "Bash(" not in claude.replace("Bash(date:*)", "")
-    assert "applied 1: Definir OSDE -> DONE" in notify
+    assert "applied 1: Renew passport -> DONE" in notify
 
 
 def test_unsaved_emacs_buffer_skips_and_notifies(env):
