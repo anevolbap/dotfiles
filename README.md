@@ -16,7 +16,7 @@ packages. The `Makefile` links each one into place.
 | `emacs/`       | Emacs 31 config (elpaca, eglot, org, eshell)    | `~/.emacs.d`                 |
 | `crkbd_layout/`| QMK keymap for the Corne (crkbd) keyboard       | `~/qmk_firmware/.../keymaps` |
 | `local/`       | Scripts in `~/.local/bin` and systemd user units | `~`                         |
-| `claude/`      | Claude Code agents and commands                 | `~`                          |
+| `claude/`      | Claude Code agents, commands and skills         | `~/.claude`, `~/.claude-*`   |
 | `dunst/`       | dunst notification daemon, replaces xfce4-notifyd | `~`                        |
 | `sway/`        | sway window manager config                      | `~`                          |
 | `system/`      | systemd-sleep hook (needs root, uses `ln`)      | `/lib/systemd/system-sleep`  |

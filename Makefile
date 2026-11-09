@@ -14,7 +14,7 @@ help:
 	@echo "  delete  — remove Emacs config symlinks"
 	@echo "  crkbd   — install Corne keyboard layout symlink"
 	@echo "  local   — install ~/.local/bin scripts (corne-rgb-alert)"
-	@echo "  claude  — install Claude Code settings (~/.claude/settings.json)"
+	@echo "  claude  — install Claude Code agents, commands, skills into ~/.claude and ~/.claude-*"
 	@echo "  dunst   — install dunst config and notification autostart entries"
 	@echo "  sway    — install sway config (~/.config/sway/config)"
 	@echo "  system  — install systemd-sleep hooks (requires sudo)"
@@ -41,9 +41,14 @@ crkbd:
 local:
 	stow --verbose --dir=$(DOTFILES_DIR) --target=$(HOME) --restow local
 
-# Claude Code global settings (~/.claude/settings.json)
+# Claude Code agents, commands and skills, linked into every config dir
+# (~/.claude and each ~/.claude-* used through CLAUDE_CONFIG_DIR).
+# settings.json is per-machine and gitignored, so stow skips it.
 claude:
-	stow --verbose --dir=$(DOTFILES_DIR) --target=$(HOME) --restow claude
+	for d in $(HOME)/.claude $(wildcard $(HOME)/.claude-*); do \
+		stow --verbose --dir=$(DOTFILES_DIR)/claude --target=$$d \
+			--ignore='settings\.json' --restow .claude || exit 1; \
+	done
 
 # Dunst notification daemon: ~/.config/dunst and the autostart entries that
 # start dunst and keep xfce4-notifyd from starting.
