@@ -603,6 +603,10 @@ where `syntax-ppss' does not reliably identify node types."
 (use-package pr-review
   :after magit)
 
+(use-package envrc
+  :ensure t
+  :hook (elpaca-after-init . envrc-global-mode))
+
 (use-package numpydoc
   :ensure t
   :after python

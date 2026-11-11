@@ -799,6 +799,14 @@ Ediff
     :after magit)
 #+end_src
 
+** Environments
+Load a project's =.envrc= (direnv) per buffer, so compile, run-python and eglot see pixi envs.
+#+begin_src emacs-lisp
+  (use-package envrc
+    :ensure t
+    :hook (elpaca-after-init . envrc-global-mode))
+#+end_src
+
 ** Python
 *** Numpydoc
 #+begin_src emacs-lisp
