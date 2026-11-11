@@ -888,8 +888,16 @@ where `syntax-ppss' does not reliably identify node types."
 ;; TDLib 1.8.63, below the 1.8.66 telega requires.
 ;;   (setq telega-use-docker t)
 ;; Session data lives in ~/.telega/ (td.binlog holds auth state).
+;; Fork branch with the native-comp require fixes (PR zevlg/telega.el#607).
+;; Swap :branch for "native-comp-decls-table" to get near zero warnings on an older master.
+;; DEPRECATED: upstream recipe, restore once #607 is merged.
+;;   (use-package telega
+;;     :init (setq telega-use-docker nil))
 (use-package telega
+  :ensure (:host github :repo "anevolbap/telega.el" :branch "fix/native-comp-declarations")
   :init (setq telega-use-docker nil))
+;; Keep native-comp warnings in *Warnings* without popping up the buffer.
+(setq native-comp-async-report-warnings-errors 'silent)
 
 (use-package claude-code-ide
   :vc (:url "https://github.com/manzaltu/claude-code-ide.el" :rev :newest)
