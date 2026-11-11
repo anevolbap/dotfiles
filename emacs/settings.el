@@ -790,6 +790,8 @@ where `syntax-ppss' does not reliably identify node types."
   :ensure nil
   :custom
   (project-vc-extra-root-markers '(".project"))
+  ;; Keep Claude worktrees and elpaca package repos out of `C-x p p'.
+  (project-list-exclude '("/\\.claude/worktrees/" "/elpaca/repos/"))
   (project-switch-commands
    '((project-find-file "Find file")
      (project-find-regexp "Find regexp")
