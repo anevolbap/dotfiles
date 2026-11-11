@@ -807,6 +807,21 @@ Load a project's =.envrc= (direnv) per buffer, so compile, run-python and eglot 
     :hook (elpaca-after-init . envrc-global-mode))
 #+end_src
 
+** Quarto
+Open =.qmd= files in markdown-mode. =C-c q= runs =quarto preview= on the current file with the repo's pixi Quarto. It passes the absolute path because pixi runs tasks from the repo root.
+#+begin_src emacs-lisp
+  (add-to-list 'auto-mode-alist '("\\.qmd\\'" . markdown-mode))
+
+  (defun ao/quarto-preview ()
+    "Run `quarto preview' on the current file through pixi."
+    (interactive)
+    (compile (format "pixi run quarto preview %s"
+                     (shell-quote-argument (buffer-file-name)))))
+
+  (with-eval-after-load 'markdown-mode
+    (keymap-set markdown-mode-map "C-c q" #'ao/quarto-preview))
+#+end_src
+
 ** Python
 *** Numpydoc
 #+begin_src emacs-lisp

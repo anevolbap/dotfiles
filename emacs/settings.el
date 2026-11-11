@@ -607,6 +607,17 @@ where `syntax-ppss' does not reliably identify node types."
   :ensure t
   :hook (elpaca-after-init . envrc-global-mode))
 
+(add-to-list 'auto-mode-alist '("\\.qmd\\'" . markdown-mode))
+
+(defun ao/quarto-preview ()
+  "Run `quarto preview' on the current file through pixi."
+  (interactive)
+  (compile (format "pixi run quarto preview %s"
+                   (shell-quote-argument (buffer-file-name)))))
+
+(with-eval-after-load 'markdown-mode
+  (keymap-set markdown-mode-map "C-c q" #'ao/quarto-preview))
+
 (use-package numpydoc
   :ensure t
   :after python
