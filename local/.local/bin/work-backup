@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# work-backup: copy the work directory to a Google Cloud Storage bucket.
+#
+# The destination stays out of this public repo. Set it in
+# ~/.config/work-backup/env:
+#
+#     WORK_BACKUP_DEST=gs://<bucket>/<path>
+#
+# WORK_BACKUP_SRC overrides the source (default ~/Documents/work). Extra
+# arguments go to gcloud, for example: work-backup --dry-run
+#
+# Files deleted locally stay in the bucket: there is no
+# --delete-unmatched-destination-objects. Environments and caches are skipped,
+# since the lock files rebuild them. Symlinks are skipped (gcloud default).
+# Run daily by work-backup.timer; output goes to journalctl --user -u work-backup.
+set -euo pipefail
+
+conf="${XDG_CONFIG_HOME:-$HOME/.config}/work-backup/env"
+# shellcheck source=/dev/null
+[ -r "$conf" ] && . "$conf"
+src="${WORK_BACKUP_SRC:-$HOME/Documents/work}"
+: "${WORK_BACKUP_DEST:?set WORK_BACKUP_DEST in $conf}"
+
+exclude='(^|.*/)(\.pixi|\.venv|node_modules|__pycache__|\.ipynb_checkpoints|\.mypy_cache|\.pytest_cache|\.ruff_cache|\.scratch)/.*'
+
+exec gcloud storage rsync --recursive --exclude="$exclude" "$@" "$src" "$WORK_BACKUP_DEST"

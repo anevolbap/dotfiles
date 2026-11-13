@@ -5,12 +5,13 @@ description: Track work in Pablo's org files so it shows in his Emacs agenda ("p
 
 # Track work in org
 
-The goal: when Pablo opens the agenda and presses `p` (Pick up), he sees every open item with the next action to take. The `p` view lists open TODO entries (any not-done keyword) in `~/Documents/org/*.org` that have a `NEXT:` line in their body, grouped by parent heading, and shows the last `NEXT:` line under each entry.
+The goal: when Pablo opens the agenda and presses `p` (Pick up), he sees every open item with the next action to take. The `p` view lists open TODO entries (any not-done keyword) in `~/Documents/org/*.org` and `~/Documents/work/org/work.org` that have a `NEXT:` line in their body, grouped by parent heading, and shows the last `NEXT:` line under each entry.
 
 So every tracked entry needs an open TODO keyword and a `NEXT:` line. An entry without `NEXT:` is invisible in `p`.
 
 ## Pick the file
 
+- Paid work: `~/Documents/work/org/work.org`, under the project's top-level heading there. Same keywords and entry format as projects.org. Work is code under `~/Documents/work/`, or anything that matches the routing notes at the top of work.org (read them first). This holds even when the same repo has personal entries in projects.org: decide by purpose, not by repo.
 - Work tied to a repo, PR or issue (open source or personal code): `~/Documents/org/projects.org`, under the project's top-level heading (`* CausalPy`, `* dotfiles`, ...). Create the project heading if it is missing.
 - Anything else (a loose task, something to read, try or check later): `~/Documents/org/tasks.org`, as a child of `* Tasks to be reviewed`, appended at the end.
 - Do not write to `claude-sessions.org`. It is generated and rewritten wholesale.

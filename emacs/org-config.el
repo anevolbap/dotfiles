@@ -24,6 +24,10 @@
 (defvar my-org-todo-keyword-faces nil
   "Extra `org-todo-keyword-faces' entries, for keywords set per file.")
 
+(defvar my-org-work-files nil
+  "Org files or directories for billable work, kept outside `my-org-directory'.
+They join the agenda files, and the Work agenda command reads only these.")
+
 (use-package org
   :ensure nil
   :mode ("\\.org\\'" . org-mode)
@@ -45,7 +49,7 @@
 
   ;; Scan the org directory at agenda-build time, not at load time.
   ;; This picks up new .org files without requiring a restart.
-  (org-agenda-files (list my-org-directory))
+  (org-agenda-files (cons my-org-directory my-org-work-files))
 
   ;; Capture templates
   (org-capture-templates
@@ -90,6 +94,18 @@
   ;; Logging
   (org-log-done 'time)
   (org-log-into-drawer "HISTORY")
+
+  ;; Clocking: C-c C-x C-i on an entry, or I in the agenda. A running clock
+  ;; and the clock history survive a restart. After 15 idle minutes org asks
+  ;; whether to keep or drop that time. CLOCK lines go to :LOGBOOK:, apart
+  ;; from the state notes in :HISTORY:.
+  (org-clock-persist t)
+  (org-clock-in-resume t)
+  (org-clock-idle-time 15)
+  (org-clock-into-drawer "LOGBOOK")
+  (org-clock-out-remove-zero-time-clocks t)
+  (org-clock-mode-line-total 'today)
+  (org-clock-report-include-clocking-task t)
 
   ;; Export
   (org-export-coding-system 'utf-8)
@@ -167,6 +183,30 @@
        (org-agenda-prefix-format '((todo . "  ")))
        (org-agenda-finalize-hook '(ao/agenda-insert-next-actions))
        (org-agenda-overriding-header "Pick up")))
+     ;; Billable work, from `my-org-work-files' only: today with the time
+     ;; clocked and a clock report, the next 14 days of deadlines and
+     ;; scheduled items, and the open entries with a NEXT: line.
+     ("w" "Work"
+      ((agenda "" ((org-agenda-span 1)
+                   (org-agenda-format-date "%A %-e %B %Y")
+                   (org-agenda-show-log t)
+                   (org-agenda-log-mode-items '(clock))
+                   (org-agenda-clockreport-mode t)
+                   (org-agenda-overriding-header "\nWork today\n")))
+       (agenda "" ((org-agenda-span 14)
+                   (org-agenda-start-day "+1d")
+                   (org-agenda-start-on-weekday nil)
+                   (org-agenda-show-all-dates nil)
+                   (org-deadline-warning-days 0)
+                   (org-agenda-entry-types '(:deadline :scheduled))
+                   (org-agenda-time-grid nil)
+                   (org-agenda-overriding-header "\nNext 14 days\n")))
+       (alltodo "" ((org-agenda-skip-function #'ao/agenda-skip-unless-next)
+                    (org-agenda-prefix-format '((todo . "  ")))
+                    (org-agenda-overriding-header "\nPick up\n"))))
+      ((org-agenda-files ',my-org-work-files)
+       (org-agenda-clockreport-parameter-plist '(:link t :maxlevel 3 :fileskip0 t))
+       (org-agenda-finalize-hook '(ao/agenda-insert-next-actions))))
      ("A" "Daily agenda and top priority tasks"
       ((agenda "" ((org-agenda-span 1)
                    (org-deadline-warning-days 0)
@@ -187,6 +227,7 @@
   :config
   (add-to-list 'org-modules 'org-habit t)
   (add-to-list 'org-modules 'org-protocol t) ; browser capture via org-protocol://
+  (org-clock-persistence-insinuate)          ; see `org-clock-persist' above
 
   ;; org-habit: show habits only on today's agenda line; keep graph narrow.
   ;; Undone habits show with the `!' glyph and leave the agenda once marked DONE,
@@ -763,6 +804,43 @@ by another block-separator line (or end of buffer)."
   ;; S-TAB: cycle all sections at once.
   (define-key org-agenda-mode-map (kbd "<tab>")     #'ao/agenda-fold-or-goto)
   (define-key org-agenda-mode-map (kbd "<backtab>") #'outline-cycle-buffer))
+
+;; ============================================================================
+;; Reminders for timed agenda entries
+;;
+;; appt shows a desktop notification (`ao/notify', utils.el) 10 and 5 minutes
+;; before each entry with a time today, such as <2026-11-13 Fri 14:00>. Only
+;; the daemon runs it: a second Emacs running it too would show every reminder
+;; twice. The list is rebuilt every hour, so entries added during the day are
+;; picked up.
+;; ============================================================================
+
+(defvar appt-display-format)
+(defvar appt-disp-window-function)
+(defvar appt-delete-window-function)
+(defvar appt-message-warning-time)
+(defvar appt-display-interval)
+(declare-function ao/notify "utils")
+
+(defun ao/appt-notify (minutes _time message)
+  "Show appt reminders as desktop notifications.
+MINUTES and MESSAGE are strings, or lists of strings when several
+reminders are due at the same time."
+  (seq-mapn (lambda (min msg) (ao/notify (format "In %s min" min) msg))
+            (ensure-list minutes) (ensure-list message)))
+
+(defun ao/org-agenda-to-appt ()
+  "Rebuild the appt list from today's agenda entries."
+  (org-agenda-to-appt t))
+
+(when (daemonp)
+  (setq appt-display-format 'window
+        appt-disp-window-function #'ao/appt-notify
+        appt-delete-window-function #'ignore
+        appt-message-warning-time 10
+        appt-display-interval 5)
+  (appt-activate 1)
+  (run-at-time 60 3600 #'ao/org-agenda-to-appt))
 
 (provide 'org-config)
 ;;; org-config.el ends here
