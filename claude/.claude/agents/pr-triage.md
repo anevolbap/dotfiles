@@ -1,5 +1,5 @@
 ---
-name: triage
+name: pr-triage
 description: Issue and PR triage, code review, git and gh operations, changelog and docs work.
 tools: Read, Grep, Glob, Bash, WebFetch
 model: sonnet
