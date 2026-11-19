@@ -29,8 +29,8 @@ SHARED_BRANCHES = {"main", "master", "develop", "gallery"}
 # A commit invocation, optionally preceded by `-C <path>`.
 COMMIT_RE = re.compile(r"\bgit\s+(?:-C\s+(?P<dir>'[^']*'|\"[^\"]*\"|\S+)\s+)?commit\b")
 
-# A `cd <path>` at the start of the command or of a chained segment.
-CD_RE = re.compile(r"(?:^|&&|\|\||;)\s*cd\s+(?P<dir>'[^']*'|\"[^\"]*\"|\S+)")
+# A `cd <path>` at the start of the command, of a chained segment, or of a line.
+CD_RE = re.compile(r"(?:^|&&|\|\||;|\n)\s*cd\s+(?P<dir>'[^']*'|\"[^\"]*\"|\S+)")
 
 # Plumbing that is not a commit to a branch.
 PLUMBING_RE = re.compile(r"\bgit\s+commit-(tree|graph)\b")
@@ -97,9 +97,16 @@ def main() -> int:
         return 0
 
     cwd = data.get("cwd") or "."
+    target = _commit_dir(cmd, cwd)
+    if "$" in target or not os.path.isdir(target):
+        sys.stderr.write(
+            f"Cannot tell which repository this commit runs in ({target}). "
+            "Use a literal path with git -C or cd, not a shell variable.\n"
+        )
+        return 2
     try:
         branch = subprocess.check_output(
-            ["git", "-C", _commit_dir(cmd, cwd), "branch", "--show-current"],
+            ["git", "-C", target, "branch", "--show-current"],
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()

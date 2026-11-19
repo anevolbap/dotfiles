@@ -95,11 +95,16 @@ def segments(tokens):
 
 def check_push(cwd, args):
     """args: the tokens after `push`. Returns a block reason or None."""
+    if "$" in cwd:
+        return (f"Blocked: cannot tell which repository this push runs in ({cwd}). "
+                "Use a literal path with git -C or cd, not a shell variable.")
     remote = None
     skip = False
     for a in args:
         if skip:
             skip = False
+        elif re.match(r"^\d*(?:>>?|<)", a):  # a redirect, not the remote
+            skip = re.fullmatch(r"\d*(?:>>?|<)", a) is not None  # target is the next token
         elif a in ("-o", "--push-option", "--receive-pack", "--exec"):
             skip = True
         elif a.startswith("--repo="):
