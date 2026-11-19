@@ -6,7 +6,7 @@ description: Review the current branch as a hostile reviewer before its PR goes 
 Review the current branch as a hostile reviewer before flipping a PR to ready-for-review.
 
 Steps:
-1. Run `git status` and `git diff <base>...HEAD` to see the full set of changes. Base defaults to `main` unless I say otherwise.
+1. Run `git fetch upstream` (or `git fetch origin` if the repo has no `upstream` remote). Then run `git status` and `git diff <base>...HEAD` to see the full set of changes. Base defaults to `upstream/main` (or `origin/main` without `upstream`) unless I say otherwise.
 2. Read the diff as if you wanted to reject it. Look for: scope creep, missing tests, dead code, ignored edge cases, docstring/behavior mismatch, debug artifacts, unrelated formatting churn.
 3. Check the PR description if a PR exists: `gh pr view --json title,body`. Confirm:
    - Concise, no em-dashes, no unsolicited @mentions, no pedantic asides.
