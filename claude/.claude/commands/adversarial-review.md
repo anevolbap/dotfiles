@@ -14,5 +14,5 @@ Steps:
    - References cited if any (papers, issues, prior PRs).
 4. Check CI: `gh pr checks` if a PR is open, otherwise run the local test and lint commands the repo uses.
 5. Verify any upstream claim (docstring, behavior, bug) against the current source of the dependency before asserting it in the PR.
-6. Report findings in prose: what a reviewer would push back on, what is missing, what to fix. Order by severity.
+6. Report findings in prose: what a reviewer would push back on, what is missing, what to fix. Order by severity. Follow `~/.claude/oss-contributions.md`: only defects, gaps and suggestions, no praise for correct parts.
 7. Do not flip the PR to ready-for-review until I sign off on the remediation.
