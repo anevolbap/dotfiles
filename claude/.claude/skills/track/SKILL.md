@@ -12,6 +12,7 @@ So every tracked entry needs an open TODO keyword and a `NEXT:` line. An entry w
 ## Pick the file
 
 - Paid work: `~/Documents/work/org/work.org`, under the project's top-level heading there. Same keywords and entry format as projects.org. Work is code under `~/Documents/work/`, or anything that matches the routing notes at the top of work.org (read them first). This holds even when the same repo has personal entries in projects.org: decide by purpose, not by repo.
+  - pymc-marketing is the exception to the path rule: only issues and PRs in the Pancake milestone, or that came out of a Pancake issue, go in work.org. Everything else from pymc-marketing goes in projects.org under `* PyMC-Marketing`. Check with `gh issue view <N> --json milestone` (or `gh pr view`). With no milestone, ask Pablo. Search both files for the number before adding.
 - Work tied to a repo, PR or issue (open source or personal code): `~/Documents/org/projects.org`, under the project's top-level heading (`* CausalPy`, `* dotfiles`, ...). Create the project heading if it is missing.
 - Anything else (a loose task, something to read, try or check later): `~/Documents/org/tasks.org`, as a child of `* Tasks to be reviewed`, appended at the end.
 - Do not write to `claude-sessions.org`. It is generated and rewritten wholesale.
