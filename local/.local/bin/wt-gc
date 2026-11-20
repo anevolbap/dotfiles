@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# wt-gc: remove git worktrees whose PR is merged or closed.
+#
+#   wt-gc [--apply] [REPO...]     (default REPO: current directory)
+#
+# Dry run by default. With --apply:
+#   MERGED PR -> remove worktree and delete local branch
+#   CLOSED PR -> remove worktree, keep branch (it may hold unmerged work)
+# Always skipped: the main worktree, dirty or locked worktrees, open PRs,
+# branches with no PR, detached HEADs, and branches with local commits
+# that are not in the PR head (all reported for a manual look).
+# Ignored files (.venv, scratch dirs) go with the worktree.
+set -euo pipefail
+
+apply=0
+repos=()
+for a in "$@"; do
+  case "$a" in
+    --apply) apply=1 ;;
+    -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) repos+=("$a") ;;
+  esac
+done
+[ ${#repos[@]} -eq 0 ] && repos=(.)
+
+run() { if [ $apply -eq 1 ]; then "$@"; else echo "  would run: $*"; fi; }
+
+# Print "<number> <state> <head sha>" for the PR of branch $2 (repo at $1).
+# Branches named pr-<N> map to PR N, others are looked up by head branch name.
+pr_state() {
+  local q='"\(.number) \(.state) \(.headRefOid)"'
+  if [[ "$2" =~ ^pr-([0-9]+)$ ]]; then
+    (cd "$1" && gh pr view "${BASH_REMATCH[1]}" --json number,state,headRefOid -q "$q") 2>/dev/null || true
+  else
+    (cd "$1" && gh pr list --head "$2" --state all --limit 1 --json number,state,headRefOid -q ".[] | $q") 2>/dev/null || true
+  fi
+}
+
+for repo in "${repos[@]}"; do
+  main=$(git -C "$repo" worktree list --porcelain | sed -n '1s/^worktree //p')
+  echo "== $main"
+  git -C "$main" worktree list --porcelain | awk '
+    /^worktree /{p=substr($0,10); b=""; l=0}
+    /^branch /{b=substr($0,8); sub("refs/heads/","",b)}
+    /^locked/{l=1}
+    /^$/{print p "\t" (b==""?"-":b) "\t" l}
+    END{if(p!="") print p "\t" (b==""?"-":b) "\t" l}' | sort -u |
+  while IFS=$'\t' read -r path branch locked; do
+    [ "$path" = "$main" ] && continue
+    if [ ! -d "$path" ]; then echo "missing  $path (git worktree prune clears it)"; continue; fi
+    if [ "$locked" = 1 ]; then echo "locked   $path"; continue; fi
+    if [ "$branch" = - ]; then echo "detached $path (check by hand)"; continue; fi
+    if [ -n "$(git -C "$path" status --porcelain)" ]; then echo "dirty    $path [$branch]"; continue; fi
+    read -r num state head <<<"$(pr_state "$path" "$branch")" || true
+    # Same name is not enough: every local commit must be in the PR head.
+    if [[ "${state:-}" =~ ^(MERGED|CLOSED)$ ]] &&
+       ! git -C "$path" merge-base --is-ancestor HEAD "$head" 2>/dev/null; then
+      echo "unsure   $path [$branch] PR #$num $state, local commits not in PR head (check by hand)"
+      continue
+    fi
+    case "${state:-}" in
+      MERGED)
+        echo "merged   $path [$branch] PR #$num"
+        run git -C "$main" worktree remove "$path"
+        run git -C "$main" branch -D "$branch" ;;
+      CLOSED)
+        echo "closed   $path [$branch] PR #$num (branch kept)"
+        run git -C "$main" worktree remove "$path" ;;
+      OPEN) echo "open     $path [$branch] PR #$num" ;;
+      *)    echo "no PR    $path [$branch]" ;;
+    esac
+  done
+  run git -C "$main" worktree prune
+done
