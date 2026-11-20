@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# wt-gc: remove git worktrees whose PR is merged or closed.
+# wt-gc: remove git worktrees and local branches whose PR is merged or closed.
 #
 #   wt-gc [--apply] [REPO...]     (default REPO: current directory; non-repos are skipped)
+#   wt-gc --remote [REPO...]      print delete commands for origin branches, change nothing
 #
 # Dry run by default. With --apply:
 #   MERGED PR -> remove worktree and delete local branch
@@ -10,14 +11,21 @@
 # branches with no PR, detached HEADs, and branches with local commits
 # that are not in the PR head (all reported for a manual look).
 # Ignored files (.venv, scratch dirs) go with the worktree.
+# Local branches without a worktree are deleted when their PR is merged and
+# every local commit is in the PR head. main, master and branches that also
+# exist on the upstream remote are never touched.
+# --remote lists origin branches whose PR is merged or closed and that still
+# point at the PR head, as `git push origin --delete` commands to run by hand.
 set -euo pipefail
 
 apply=0
+remote=0
 repos=()
 for a in "$@"; do
   case "$a" in
     --apply) apply=1 ;;
-    -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --remote) remote=1 ;;
+    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) repos+=("$a") ;;
   esac
 done
@@ -36,6 +44,43 @@ pr_state() {
   fi
 }
 
+# Shared branches that must never be deleted.
+protected() {
+  [[ "$2" =~ ^(main|master)$ ]] || git -C "$1" show-ref -q --verify "refs/remotes/upstream/$2"
+}
+
+# Delete local branches of merged PRs that no worktree has checked out.
+local_branches() {
+  local main=$1 b wt num state head
+  git -C "$main" for-each-ref refs/heads --format='%(refname:short)%09%(worktreepath)' |
+  while IFS=$'\t' read -r b wt; do
+    [ -n "$wt" ] && continue
+    protected "$main" "$b" && continue
+    read -r num state head <<<"$(pr_state "$main" "$b")" || true
+    [ "${state:-}" = MERGED ] || continue
+    if git -C "$main" merge-base --is-ancestor "refs/heads/$b" "$head" 2>/dev/null; then
+      echo "branch   [$b] PR #$num MERGED"
+      run git -C "$main" branch -D "$b"
+    else
+      echo "branch   [$b] PR #$num MERGED, local commits not in PR head (kept)"
+    fi
+  done
+}
+
+# Print delete commands for origin branches of merged or closed PRs.
+remote_branches() {
+  local main=$1 sha ref b num state head
+  git -C "$main" ls-remote --heads origin 2>/dev/null |
+  while read -r sha ref; do
+    b=${ref#refs/heads/}
+    protected "$main" "$b" && continue
+    read -r num state head <<<"$(pr_state "$main" "$b")" || true
+    if [[ "${state:-}" =~ ^(MERGED|CLOSED)$ ]] && [ "$sha" = "$head" ]; then
+      echo "git -C $main push origin --delete $b   # PR #$num $state"
+    fi
+  done
+}
+
 declare -A seen
 for repo in "${repos[@]}"; do
   # Not a repo (globs match plain folders too), or a repo seen through another worktree.
@@ -43,6 +88,10 @@ for repo in "${repos[@]}"; do
   [ -z "$main" ] || [ -n "${seen[$main]:-}" ] && continue
   seen[$main]=1
   echo "== $main"
+  if [ $remote -eq 1 ]; then
+    remote_branches "$main"
+    continue
+  fi
   git -C "$main" worktree list --porcelain | awk '
     /^worktree /{p=substr($0,10); b=""; l=0}
     /^branch /{b=substr($0,8); sub("refs/heads/","",b)}
@@ -75,4 +124,5 @@ for repo in "${repos[@]}"; do
     esac
   done
   run git -C "$main" worktree prune
+  local_branches "$main"
 done
