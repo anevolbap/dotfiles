@@ -10,5 +10,6 @@ ExecStartPre=/bin/sh -c 'for i in $(seq 30); do getent hosts api.github.com >/de
 # "/home/me/code/*/"). It lives in a machine-local file outside dotfiles. The
 # shell expands the globs; wt-gc skips matches that are not git repos.
 EnvironmentFile=%h/.config/wt-gc.env
-ExecStart=/bin/sh -c 'exec %h/.local/bin/wt-gc --apply $$WT_GC_GLOBS'
+# wt-gc-org puts the worktrees left behind into tasks.org or work.org.
+ExecStart=/bin/bash -c 'set -o pipefail; %h/.local/bin/wt-gc --apply $$WT_GC_GLOBS | %h/.local/bin/wt-gc-org'
 # Output goes to the journal: journalctl --user -u wt-gc

@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""
+wt-gc-org: put the worktrees wt-gc did not remove into an org TODO entry.
+
+    wt-gc --apply DIR... | wt-gc-org
+
+Reads wt-gc output on stdin and copies it to stdout. Worktrees of repos under ~/Documents/work/ go to the
+Inbox of work.org, all others to "Tasks to be reviewed" in tasks.org, in the
+shape of the "w" and "t" capture templates. Each file gets one entry, found by
+its :WT_GC: property and rewritten in place: a Pending: checklist with one
+worktree per line and a NEXT: line, so it shows in the agenda "p" view. When a
+file has no leftovers its entry turns DONE.
+
+Reported: no PR, unsure, detached, dirty, missing. Open PRs are not reported,
+and neither are locked worktrees: `git worktree lock <path>` means "keep it".
+
+A file is written only when its entry changes, and never while Emacs has
+unsaved changes in it (the next run retries).
+
+TASKS_ORG and WORK_ORG override the two files (tests).
+"""
+
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+HOME = str(Path.home())
+WORK_ROOT = os.path.join(HOME, "Documents", "work") + os.sep
+TASKS_ORG = os.environ.get("TASKS_ORG", f"{HOME}/Documents/org/tasks.org")
+WORK_ORG = os.environ.get("WORK_ORG", f"{HOME}/Documents/work/org/work.org")
+PARENTS = {TASKS_ORG: "* Tasks to be reviewed", WORK_ORG: "* Inbox"}
+REPORTED = ("no PR", "unsure", "detached", "dirty", "missing")
+TITLE = "Review leftover git worktrees"
+MARK = ":WT_GC: leftovers"
+
+
+def leftovers(lines):
+    """Map each org file to its leftover lines, in wt-gc order."""
+    out = {TASKS_ORG: [], WORK_ORG: []}
+    dest = TASKS_ORG
+    for line in lines:
+        line = line.rstrip()
+        if line.startswith("== "):
+            # Route by the main repo: a worktree of a work repo may live anywhere.
+            dest = WORK_ORG if (line[3:] + os.sep).startswith(WORK_ROOT) else TASKS_ORG
+        elif line.startswith(REPORTED):
+            out[dest].append("- [ ] " + " ".join(line.replace(HOME, "~").split()))
+    return out
+
+
+def find_entry(lines):
+    """Return (start, end) of the marked entry, or None."""
+    for i, line in enumerate(lines):
+        if line.strip() == MARK:
+            start = max(j for j in range(i + 1) if lines[j].startswith("*"))
+            level = len(lines[start]) - len(lines[start].lstrip("*"))
+            end = next(
+                (
+                    k
+                    for k in range(start + 1, len(lines))
+                    if re.match(rf"\*{{1,{level}}} ", lines[k])
+                ),
+                len(lines),
+            )
+            return start, end
+    return None
+
+
+def build(items, captured, now):
+    if items:
+        head = [f"** TODO {TITLE}"]
+        body = [
+            "",
+            f"wt-gc did not remove these worktrees (updated {now:%Y-%m-%d}).",
+            "",
+            "Pending:",
+            *items,
+            "",
+            "NEXT: for each worktree, remove it, push its work, or lock it "
+            "(git worktree lock <path>) to keep it and stop this report.",
+        ]
+    else:
+        head = [f"** DONE {TITLE}", f"CLOSED: [{now:%Y-%m-%d %a}]"]
+        body = ["", f"No leftover worktrees (updated {now:%Y-%m-%d})."]
+    drawer = [":PROPERTIES:", f":CAPTURED: {captured}", MARK, ":END:"]
+    return head + drawer + body + [""]
+
+
+def unsaved_in_emacs(path):
+    expr = (
+        f'(let ((b (find-buffer-visiting "{path}"))) '
+        "(and b (buffer-modified-p b) t))"
+    )
+    try:
+        r = subprocess.run(
+            ["emacsclient", "-e", expr], capture_output=True, text=True, timeout=10
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False  # no daemon, so no buffer can hold unsaved changes
+    return r.returncode == 0 and r.stdout.strip() == "t"
+
+
+def update(path, items, now):
+    lines = Path(path).read_text().split("\n")
+    found = find_entry(lines)
+    if found is None and not items:
+        return "nothing to report"
+    captured = f"[{now:%Y-%m-%d %a %H:%M}]"
+    if found:
+        start, end = found
+        old = lines[start:end]
+        for line in old:
+            if line.startswith(":CAPTURED:"):
+                captured = line.split(None, 1)[1]
+        new = build(items, captured, now)
+        # Ignore the date line when comparing, so an unchanged list is not rewritten.
+        same = [x for x in old if "(updated " not in x] == [
+            x for x in new if "(updated " not in x
+        ]
+        if same or (not items and old[0].startswith("** DONE")):
+            return "unchanged"
+    else:
+        parent = lines.index(PARENTS[path])
+        start = end = next(
+            (k for k in range(parent + 1, len(lines)) if lines[k].startswith("* ")),
+            len(lines),
+        )
+        new = build(items, captured, now)
+    if unsaved_in_emacs(path):
+        return "skipped, Emacs has unsaved changes"
+    lines[start:end] = new
+    Path(path).write_text("\n".join(lines))
+    return f"{len(items)} leftover(s) written" if items else "entry closed"
+
+
+def main():
+    now = datetime.now()
+    lines = sys.stdin.readlines()
+    print("".join(lines), end="")  # pass wt-gc output through, for the journal
+    for path, items in leftovers(lines).items():
+        print(f"wt-gc-org: {path}: {update(path, items, now)}")
+
+
+if __name__ == "__main__":
+    main()
