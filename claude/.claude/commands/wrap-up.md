@@ -1,10 +1,10 @@
 ---
-description: End-of-session check for a PR or issue session (tracking, cleanup, leftovers, safe to delete the session)
+description: End-of-session check for a PR or issue session (tracking, cleanup, leftovers, follow-ups, safe to delete the session)
 argument-hint: [PR or issue number]
 ---
 # Wrap up
 
-Answer four questions for this session: is the work tracked, is the cleanup done, is anything left over, can the session be deleted. Check live state for every answer. Do not answer from memory.
+Answer five questions for this session: is the work tracked, is the cleanup done, is anything left over, are the follow-ups tracked, can the session be deleted. Check live state for every answer. Do not answer from memory.
 
 1. Find the target. Use `$ARGUMENTS` if given. Otherwise take the branch of the session's worktree (`git branch --show-current`) and look it up with `gh pr list --head <branch> --state all`, or search the tracker for the branch name. If there is still no target, ask.
 2. Get live state: `gh pr view <N> --json state,mergedAt,isDraft,url,headRefName` (or `gh issue view <N> --json state,url` for an issue with no PR).
@@ -22,17 +22,19 @@ Answer four questions for this session: is the work tracked, is the cleanup done
    - CLOSED without merge: ask before you remove anything. The branch may hold work worth keeping.
    - Issue with no PR: remove the worktree only if it has no commits beyond its base. Otherwise keep it.
 5. Track with the `track` skill. A finished entry gets its done keyword and a Done: line. An open entry gets a dated `:STATUS:` and a `NEXT:` line that says the next concrete action, so `/resume-entry` can continue without this session.
-6. If the session fixed a problem that meets the CLAUDE.md "Problem notes" rule and no note exists yet, write it with `roam-problem` and give the path.
-7. Run `git worktree list` again and report in this format, one line each:
+6. Collect follow-ups. Go through the whole session and list everything it suggested or found but did not do: possible new issues, follow-up PRs, deferred review comments, bugs noticed on the way, TODOs left in code. Search the tracker and `gh issue list --search` first so you do not add duplicates. Track each new one with the `track` skill as a TODO with a `NEXT:` line. Do not open issues or PRs, only track them.
+7. If the session fixed a problem that meets the CLAUDE.md "Problem notes" rule and no note exists yet, write it with `roam-problem` and give the path.
+8. Run `git worktree list` again and report in this format, one line each:
 
 ```text
 Target:   PR #N <state> <url>
 Tracker:  <file> / <heading>, <keyword>, NEXT: <text or "closed">
 Cleanup:  <what was removed, or "none needed (PR open)">
 Leftovers: <list, or "none">
+Follow-ups: <each one with its tracker heading, or "none">
 Delete session: yes|no, <reason>
 ```
 
-Answer "yes" for delete session only when all of these hold: nothing is uncommitted, unpushed or stashed for this work, the tracker entry is closed or has a `NEXT:` line, no draft waits for approval, and no background job from this session is still running. Deleting the session loses only the chat context. The tracker entry and the branch are what `/resume-entry` uses.
+Answer "yes" for delete session only when all of these hold: nothing is uncommitted, unpushed or stashed for this work, the tracker entry is closed or has a `NEXT:` line, every follow-up is tracked, no draft waits for approval, and no background job from this session is still running. Deleting the session loses only the chat context. The tracker entry and the branch are what `/resume-entry` uses.
 
 Never push, delete remote branches or post anything from this command. Print those commands for me to run.
