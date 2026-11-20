@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # wt-gc: remove git worktrees whose PR is merged or closed.
 #
-#   wt-gc [--apply] [REPO...]     (default REPO: current directory)
+#   wt-gc [--apply] [REPO...]     (default REPO: current directory; non-repos are skipped)
 #
 # Dry run by default. With --apply:
 #   MERGED PR -> remove worktree and delete local branch
@@ -23,7 +23,7 @@ for a in "$@"; do
 done
 [ ${#repos[@]} -eq 0 ] && repos=(.)
 
-run() { if [ $apply -eq 1 ]; then "$@"; else echo "  would run: $*"; fi; }
+run() { if [ $apply -eq 1 ]; then "$@" || echo "  failed: $*"; else echo "  would run: $*"; fi; }
 
 # Print "<number> <state> <head sha>" for the PR of branch $2 (repo at $1).
 # Branches named pr-<N> map to PR N, others are looked up by head branch name.
@@ -36,8 +36,12 @@ pr_state() {
   fi
 }
 
+declare -A seen
 for repo in "${repos[@]}"; do
-  main=$(git -C "$repo" worktree list --porcelain | sed -n '1s/^worktree //p')
+  # Not a repo (globs match plain folders too), or a repo seen through another worktree.
+  main=$(git -C "$repo" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p') || true
+  [ -z "$main" ] || [ -n "${seen[$main]:-}" ] && continue
+  seen[$main]=1
   echo "== $main"
   git -C "$main" worktree list --porcelain | awk '
     /^worktree /{p=substr($0,10); b=""; l=0}
